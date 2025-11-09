@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
 import { VocabSet, VocabItem } from '../types';
 import { PlusIcon } from './icons/PlusIcon';
@@ -15,6 +15,58 @@ interface Props {
   onClose: () => void;
 }
 
+// Manual pinyin tone conversion map
+const toneMap: { [key: string]: { [tone: string]: string } } = {
+  'a': { '1': 'ā', '2': 'á', '3': 'ǎ', '4': 'à', '5': 'a' },
+  'e': { '1': 'ē', '2': 'é', '3': 'ě', '4': 'è', '5': 'e' },
+  'i': { '1': 'ī', '2': 'í', '3': 'ǐ', '4': 'ì', '5': 'i' },
+  'o': { '1': 'ō', '2': 'ó', '3': 'ǒ', '4': 'ò', '5': 'o' },
+  'u': { '1': 'ū', '2': 'ú', '3': 'ǔ', '4': 'ù', '5': 'u' },
+  'ü': { '1': 'ǖ', '2': 'ǘ', '3': 'ǚ', '4': 'ǜ', '5': 'ü' },
+  'v': { '1': 'ǖ', '2': 'ǘ', '3': 'ǚ', '4': 'ǜ', '5': 'ü' },
+};
+
+// Convert numbered pinyin to toned pinyin
+const convertNumberedPinyin = (input: string): string => {
+  const lowerInput = input.toLowerCase();
+  
+  // Split by spaces first, then process each part
+  const parts = lowerInput.split(/\s+/);
+  
+  const processedParts = parts.map(part => {
+    // Match all syllables with tone numbers in the part (e.g., "ni3hao3ma" -> ["ni3", "hao3", "ma"])
+    const syllablePattern = /([a-züv]+[1-5]?)/g;
+    const syllables = part.match(syllablePattern) || [part];
+    
+    return syllables.map(syllable => {
+      const match = syllable.match(/^([a-züv]+)([1-5])$/);
+      if (!match) return syllable;
+      
+      const [, letters, tone] = match;
+      
+      // Find which vowel gets the tone mark (priority: a, o, e, iu, then other vowels)
+      let toneIndex = -1;
+      if (letters.includes('a')) toneIndex = letters.indexOf('a');
+      else if (letters.includes('o')) toneIndex = letters.indexOf('o');
+      else if (letters.includes('e')) toneIndex = letters.indexOf('e');
+      else if (letters.includes('iu')) toneIndex = letters.indexOf('u');
+      else if (letters.includes('i')) toneIndex = letters.indexOf('i');
+      else if (letters.includes('u')) toneIndex = letters.indexOf('u');
+      else if (letters.includes('ü')) toneIndex = letters.indexOf('ü');
+      else if (letters.includes('v')) toneIndex = letters.indexOf('v');
+      
+      if (toneIndex === -1) return syllable;
+      
+      const vowel = letters[toneIndex] === 'v' ? 'v' : letters[toneIndex];
+      const tonedVowel = toneMap[vowel]?.[tone] || vowel;
+      
+      return letters.substring(0, toneIndex) + tonedVowel + letters.substring(toneIndex + 1);
+    }).join('');
+  });
+  
+  return processedParts.join(' ');
+};
+
 // Helper function to parse a single line of a CSV, handling quoted fields.
 const parseCsvLine = (row: string, delimiter: string): string[] => {
     const values = [];
@@ -23,7 +75,7 @@ const parseCsvLine = (row: string, delimiter: string): string[] => {
     for (let i = 0; i < row.length; i++) {
         const char = row[i];
         if (char === '"') {
-            if (inQuote && row[i+1] === '"') { // Handle "" escape sequence for a quote inside a field
+            if (inQuote && row[i+1] === '"') {
                 current += '"';
                 i++;
             } else {
@@ -59,11 +111,30 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   if (!context) return null;
   const { state, saveSet } = context;
 
+  useEffect(() => {
+    if (set) {
+      setTitle(set.title);
+      setDescription(set.description);
+      setItems(set.items);
+    } else {
+      setTitle('');
+      setDescription('');
+      setItems([]);
+    }
+  }, [set]);
+
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => {
         setToastMessage(null);
     }, 3000);
+  };
+
+  const handlePinyinBlur = (value: string, updater: (newValue: string) => void) => {
+      if (/\d/.test(value)) {
+          const converted = convertNumberedPinyin(value);
+          updater(converted);
+      }
   };
 
   const handleSaveSet = async () => {
@@ -76,7 +147,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
         title,
         description,
         items,
-        ...(set && { _id: set._id }) // Include _id only if it exists (for updates)
+        ...(set && { _id: set._id })
     };
     
     await saveSet(setToSave);
@@ -124,7 +195,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     }
   };
 
-
   const handleTriggerImport = () => {
     fileInputRef.current?.click();
   };
@@ -137,7 +207,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     reader.onload = (e) => {
         const text = e.target?.result as string;
         try {
-            // Remove BOM and filter out empty lines
             const cleanedText = text.startsWith('\uFEFF') ? text.substring(1) : text;
             let lines = cleanedText.split(/\r?\n/).filter(line => line.trim() !== '');
 
@@ -146,7 +215,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               return;
             }
             
-            // Remove header if it exists
             if (lines[0] && lines[0].toLowerCase().includes('hanzi')) {
                 lines.shift();
             }
@@ -156,11 +224,9 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               return;
             }
 
-            // --- Delimiter Detection Logic ---
             const firstLine = lines[0];
             let delimiter = ',';
             const partsByComma = parseCsvLine(firstLine, ',');
-            // If comma parsing results in one column and semicolons exist, try semicolon
             if (partsByComma.length === 1 && firstLine.includes(';')) {
                 const partsBySemicolon = parseCsvLine(firstLine, ';');
                 if (partsBySemicolon.length > 1) {
@@ -198,7 +264,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
         showToast("Error: Failed to read the file.");
     };
     reader.readAsText(file);
-    event.target.value = ''; // Reset file input to allow re-uploading the same file
+    event.target.value = '';
   };
   
   const handleExportCSV = () => {
@@ -231,8 +297,8 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
 
   const handleDownloadTemplate = () => {
     const header = "hanzi,pinyin,meaning,exampleSentence\n";
-    const example1 = `"你好","nǐ hǎo","hello","你好，世界！ (nǐ hǎo, shì jiè!) - Hello, world!"\n`;
-    const example2 = `"谢谢","xièxie","thank you","非常感谢你。 (fēi cháng gǎn xiè nǐ) - Thank you very much."\n`;
+    const example1 = `"你好","ni3 hao3","hello","你好，世界！ (nǐ hǎo, shì jiè!) - Hello, world!"\n`;
+    const example2 = `"谢谢","xie4 xie","thank you","非常感谢你。 (fēi cháng gǎn xiè nǐ) - Thank you very much."\n`;
     const templateContent = header + example1 + example2;
 
     const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
@@ -244,8 +310,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-};
-
+  };
 
   return (
     <>
@@ -291,7 +356,14 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
                       <div key={item.id} className="p-3 border bg-gray-50 rounded-md">
                           <div className="grid grid-cols-1 md:grid-cols-7 gap-2 items-center">
                               <input type="text" value={item.hanzi} placeholder="Hanzi" onChange={e => handleItemChange(index, 'hanzi', e.target.value)} className="border p-2 rounded-md md:col-span-2"/>
-                              <input type="text" value={item.pinyin} placeholder="Pinyin" onChange={e => handleItemChange(index, 'pinyin', e.target.value)} className="border p-2 rounded-md md:col-span-2"/>
+                              <input 
+                                  type="text" 
+                                  value={item.pinyin} 
+                                  placeholder="nǐ hǎo (or ni3 hao3)" 
+                                  onChange={e => handleItemChange(index, 'pinyin', e.target.value)}
+                                  onBlur={e => handlePinyinBlur(e.target.value, (newValue) => handleItemChange(index, 'pinyin', newValue))}
+                                  className="border p-2 rounded-md md:col-span-2"
+                              />
                               <input type="text" value={item.meaning} placeholder="Meaning" onChange={e => handleItemChange(index, 'meaning', e.target.value)} className="border p-2 rounded-md md:col-span-2"/>
                               <button onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-700 p-2 justify-self-center"><TrashIcon size={20}/></button>
                           </div>
@@ -311,12 +383,19 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               </div>
               <div className="pt-4 border-t">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
-                      <input type="text" value={newItem.hanzi} onChange={e => setNewItem({...newItem, hanzi: e.target.value})} placeholder="新 (xīn)" className="border p-2 rounded-md"/>
-                      <input type="text" value={newItem.pinyin} onChange={e => setNewItem({...newItem, pinyin: e.target.value})} placeholder="xīn" className="border p-2 rounded-md"/>
-                      <input type="text" value={newItem.meaning} onChange={e => setNewItem({...newItem, meaning: e.target.value})} placeholder="new" className="border p-2 rounded-md"/>
+                      <input type="text" value={newItem.hanzi} onChange={e => setNewItem(prev => ({...prev, hanzi: e.target.value}))} placeholder="新 (xīn)" className="border p-2 rounded-md"/>
+                      <input 
+                          type="text" 
+                          value={newItem.pinyin} 
+                          onChange={e => setNewItem(prev => ({...prev, pinyin: e.target.value}))} 
+                          onBlur={e => handlePinyinBlur(e.target.value, (newValue) => setNewItem(prev => ({...prev, pinyin: newValue})))}
+                          placeholder="nǐ hǎo (or ni3 hao3)" 
+                          className="border p-2 rounded-md"
+                      />
+                      <input type="text" value={newItem.meaning} onChange={e => setNewItem(prev => ({...prev, meaning: e.target.value}))} placeholder="new" className="border p-2 rounded-md"/>
                   </div>
                    <div className="flex items-center mt-2">
-                      <textarea value={newItem.exampleSentence || ''} onChange={e => setNewItem({...newItem, exampleSentence: e.target.value})} placeholder="Example: 这是我的新书 (zhè shì wǒ de xīn shū)" className="w-full border p-2 rounded-md" rows={3}/>
+                      <textarea value={newItem.exampleSentence || ''} onChange={e => setNewItem(prev => ({...prev, exampleSentence: e.target.value}))} placeholder="Example: 这是我的新书 (zhè shì wǒ de xīn shū)" className="w-full border p-2 rounded-md" rows={3}/>
                       <button 
                           onClick={() => handleGenerateExample('new')} 
                           className="ml-2 p-2 h-10 w-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 disabled:bg-gray-200 disabled:cursor-not-allowed"
