@@ -1,7 +1,7 @@
 import { User, VocabSet } from '../types';
 
-const API_URL = 'http://localhost:5001/api'; // Your backend URL
-
+// const API_URL = 'http://localhost:5001/api'; // Your backend URL
+const API_URL = process.env.URL; // Your backend URL
 // Helper to get the token from localStorage
 const getToken = (): string | null => {
     const storedUser = localStorage.getItem('hanziflow_user');
