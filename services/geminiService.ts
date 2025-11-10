@@ -181,30 +181,17 @@ const extractJsonFromMarkdown = (text: string): any => {
 };
 
 export const generateVocabSet = async (topic: string, count: number): Promise<any[] | null> => {
-    const prompt = `Generate a list of ${count} Chinese vocabulary words related to the topic "${topic}". The words should be suitable for a beginner to intermediate learner. For each word, provide the Hanzi, standard Pinyin with correct tone marks, a concise English meaning, and a simple example sentence in Chinese.`;
+    const prompt = `Generate a list of ${count} Chinese vocabulary words related to the topic "${topic}".
+The words should be suitable for a beginner to intermediate learner.
+For each word, provide the Hanzi, standard Pinyin with correct tone marks, a concise English meaning, and a simple example sentence in Chinese.
+IMPORTANT: Respond ONLY with a valid JSON array of objects inside a single markdown code block (\`\`\`json ... \`\`\`). Do not include any other text, explanation, or introductory phrases.
+Each object in the array must have these exact keys: "hanzi", "pinyin", "meaning", "exampleSentence".`;
 
     try {
         const ai = getApiClient();
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    description: "A list of generated vocabulary words.",
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            hanzi: { type: Type.STRING, description: "The word in Chinese characters." },
-                            pinyin: { type: Type.STRING, description: "The Pinyin pronunciation with tone marks." },
-                            meaning: { type: Type.STRING, description: "The English meaning of the word." },
-                            exampleSentence: { type: Type.STRING, description: "A simple example sentence in Chinese." }
-                        },
-                        required: ["hanzi", "pinyin", "meaning", "exampleSentence"]
-                    }
-                },
-            },
         });
 
         if (response.promptFeedback?.blockReason) {
