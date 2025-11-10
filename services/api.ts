@@ -1,6 +1,7 @@
-import { User, VocabSet, QuizHistory } from '../types';
+import { User, VocabSet, QuizHistory, QuizResultType } from '../types';
 
-const API_URL = 'http://localhost:5001/api'; // Your backend URL
+// const API_URL = 'http://localhost:5001/api'; // Your backend URL
+const API_URL = process.env.URL
 
 // Helper to get the token from localStorage
 const getToken = (): string | null => {
@@ -60,7 +61,7 @@ export const getSets = async (): Promise<VocabSet[]> => {
     return await res.json();
 };
 
-export const saveSet = async (set: Omit<VocabSet, '_id' | 'user'> & { _id?: string }): Promise<VocabSet> => {
+export const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }): Promise<VocabSet> => {
     const token = getToken();
     if (!token) throw new Error("Not authenticated");
 
@@ -112,7 +113,7 @@ export const getQuizHistory = async (): Promise<QuizHistory[]> => {
     return await res.json();
 };
 
-export const saveQuizResult = async (resultData: { vocabSet: string; score: number; total: number }): Promise<QuizHistory> => {
+export const saveQuizResult = async (setId: string, result: QuizResultType): Promise<{ newHistoryItem: QuizHistory, updatedUser: Partial<User>, updatedSet?: VocabSet }> => {
     const token = getToken();
     if (!token) throw new Error("Not authenticated");
 
@@ -122,12 +123,60 @@ export const saveQuizResult = async (resultData: { vocabSet: string; score: numb
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(resultData),
+        body: JSON.stringify({ 
+            vocabSet: setId,
+            score: result.score,
+            total: result.total,
+            questions: result.questions, // Send full questions for SRS processing
+        }),
     });
 
     if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Failed to save quiz result");
+    }
+    return await res.json();
+};
+
+// --- Community Features ---
+export const getPublicSets = async (): Promise<VocabSet[]> => {
+    const token = getToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(`${API_URL}/sets/community`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) {
+        throw new Error("Failed to fetch community sets");
+    }
+    return await res.json();
+};
+
+export const getPublicSetDetails = async (setId: string): Promise<VocabSet> => {
+    const token = getToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(`${API_URL}/sets/community/${setId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) {
+        throw new Error("Failed to fetch set details");
+    }
+    return await res.json();
+};
+
+export const cloneSet = async (setId: string): Promise<{ newSet: VocabSet, updatedUser: Partial<User> }> => {
+    const token = getToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(`${API_URL}/sets/clone/${setId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to clone set");
     }
     return await res.json();
 };

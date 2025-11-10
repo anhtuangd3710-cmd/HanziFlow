@@ -1,10 +1,12 @@
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
 import { AppState, Action, User, VocabSet, View, QuizHistory, QuizResultType, VocabItem } from '../types';
 import * as api from '../services/api';
+import * as geminiService from '../services/geminiService';
 
 const initialState: AppState = {
   user: null,
   vocabSets: [],
+  publicSets: [],
   quizHistory: [], // Initialize quiz history
   currentView: { view: 'DASHBOARD' },
   isLoading: false,
@@ -16,12 +18,17 @@ const appReducer = (state: AppState, action: Action): AppState => {
       return { ...state, user: action.payload, isLoading: false };
     case 'LOGOUT':
       return { ...initialState };
+    case 'UPDATE_USER':
+      if (!state.user) return state; // Should not happen if logged in
+      return { ...state, user: { ...state.user, ...action.payload } };
     case 'SET_VIEW':
       return { ...state, currentView: action.payload };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SETS_LOADED':
       return { ...state, vocabSets: action.payload };
+    case 'PUBLIC_SETS_LOADED':
+      return { ...state, publicSets: action.payload, isLoading: false };
     case 'ADD_SET':
       return { ...state, vocabSets: [...state.vocabSets, action.payload] };
     case 'UPDATE_SET':
@@ -54,28 +61,47 @@ interface AppContextType {
     logout: () => void;
     setView: (view: View) => void;
     fetchSets: () => Promise<void>;
-    saveSet: (set: Omit<VocabSet, '_id' | 'user'> & { _id?: string }) => Promise<void>;
+    saveSet: (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => Promise<void>;
     deleteSet: (setId: string) => Promise<void>;
     saveQuizResult: (setId: string, result: QuizResultType) => Promise<void>;
     toggleNeedsReview: (setId: string, itemId: string) => Promise<void>;
+    generateSetWithAI: (topic: string, count: number) => Promise<VocabItem[] | null>;
+    fetchPublicSets: () => Promise<void>;
+    cloneSet: (setId: string) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [state, dispatch] = useReducer(appReducer, initialState, (initial) => {
-        const storedUser = localStorage.getItem('hanziflow_user');
-        if (storedUser) {
-            try {
-                const user: User = JSON.parse(storedUser);
-                return { ...initial, user };
-            } catch {
-                localStorage.removeItem('hanziflow_user');
-                return initial;
-            }
+const getInitialState = (): AppState => {
+    const storedUser = localStorage.getItem('hanziflow_user');
+    let user: User | null = null;
+    if (storedUser) {
+        try {
+            user = JSON.parse(storedUser);
+        } catch {
+            localStorage.removeItem('hanziflow_user');
         }
-        return initial;
-    });
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
+    let currentView: View = { view: 'DASHBOARD' };
+
+    if (user) { // Only allow deep links if logged in
+        if (viewParam === 'community') {
+            currentView = { view: 'COMMUNITY' };
+        }
+        const setIdParam = urlParams.get('setId');
+        if (viewParam === 'public_set_preview' && setIdParam) {
+            currentView = { view: 'PUBLIC_SET_PREVIEW', setId: setIdParam };
+        }
+    }
+
+    return { ...initialState, user, currentView };
+};
+
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [state, dispatch] = useReducer(appReducer, getInitialState());
 
     const setView = (view: View) => {
         dispatch({ type: 'SET_VIEW', payload: view });
@@ -116,7 +142,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!state.user?.token) return;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            // Fetch sets and history in parallel
             const [sets, history] = await Promise.all([
                 api.getSets(),
                 api.getQuizHistory()
@@ -131,7 +156,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, [state.user?.token]);
 
 
-    const saveSet = async (set: Omit<VocabSet, '_id' | 'user'> & { _id?: string }) => {
+    const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => {
         if (!state.user) throw new Error("User not logged in");
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
@@ -164,17 +189,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const saveQuizResult = async (setId: string, result: QuizResultType) => {
-        if (!state.user) return; // Don't save if not logged in
+        if (!state.user) return;
         try {
-            const newHistoryItem = await api.saveQuizResult({
-                vocabSet: setId,
-                score: result.score,
-                total: result.total
-            });
+            const { newHistoryItem, updatedUser, updatedSet } = await api.saveQuizResult(setId, result);
+            
             dispatch({ type: 'ADD_HISTORY_ITEM', payload: newHistoryItem });
+            dispatch({ type: 'UPDATE_USER', payload: updatedUser });
+            if (updatedSet) {
+              dispatch({ type: 'UPDATE_SET', payload: updatedSet });
+            }
+
+            const storedUser = localStorage.getItem('hanziflow_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                const updatedStoredUser = { ...user, ...updatedUser };
+                localStorage.setItem('hanziflow_user', JSON.stringify(updatedStoredUser));
+            }
+
         } catch (error) {
             console.error("Failed to save quiz result:", error);
-            // Don't bother the user with an alert, just log it.
         }
     };
     
@@ -201,9 +234,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             await api.saveSet(setToSave);
         } catch (error) {
             console.error("Failed to update 'needs review' status:", error);
-            // Revert optimistic update on failure
             dispatch({ type: 'UPDATE_SET', payload: targetSet }); 
             alert("Could not update item. Please try again.");
+        }
+    };
+    
+    const generateSetWithAI = async (topic: string, count: number): Promise<VocabItem[] | null> => {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const words = await geminiService.generateVocabSet(topic, count);
+            if (words) {
+                return words.map((word: any, index: number) => ({
+                    ...word,
+                    id: `ai-${Date.now()}-${index}`,
+                }));
+            }
+            return null;
+        } catch (error) {
+            console.error("AI set generation failed:", error);
+            alert("Failed to generate vocabulary set with AI. Please try again.");
+            return null;
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    };
+
+    const fetchPublicSets = async () => {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const publicSets = await api.getPublicSets();
+            dispatch({ type: 'PUBLIC_SETS_LOADED', payload: publicSets });
+        } catch (error) {
+            console.error("Failed to fetch public sets:", error);
+            alert((error as Error).message);
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    };
+
+    const cloneSet = async (setId: string) => {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const { newSet, updatedUser } = await api.cloneSet(setId);
+            dispatch({ type: 'ADD_SET', payload: newSet });
+            dispatch({ type: 'UPDATE_USER', payload: updatedUser });
+
+            const storedUser = localStorage.getItem('hanziflow_user');
+            if (storedUser) {
+                const user = JSON.parse(storedUser);
+                const updatedStoredUser = { ...user, ...updatedUser };
+                localStorage.setItem('hanziflow_user', JSON.stringify(updatedStoredUser));
+            }
+            
+            alert(`Set "${newSet.title}" has been added to your collection!`);
+            setView({ view: 'DASHBOARD' });
+        } catch (error) {
+            console.error("Failed to clone set:", error);
+            alert((error as Error).message);
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
         }
     };
 
@@ -215,7 +303,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, setView, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview }}>
+    <AppContext.Provider value={{ state, login, register, logout, setView, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, fetchPublicSets, cloneSet }}>
       {children}
     </AppContext.Provider>
   );

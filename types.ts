@@ -3,6 +3,13 @@ export interface User {
   email: string;
   name: string;
   token?: string; // Token is received on login
+  // --- Gamification Fields ---
+  xp: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastStudiedDate?: string;
+  // --- Community Fields ---
+  clonedSets?: string[]; // Array of original set IDs
 }
 
 export interface VocabItem {
@@ -13,6 +20,9 @@ export interface VocabItem {
   exampleSentence?: string;
   _id?: string; // Mongoose might add an _id to subdocuments
   needsReview?: boolean;
+  // --- SRS Fields ---
+  srsLevel?: number;
+  nextReviewDate?: string; // ISO date string
 }
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -24,6 +34,12 @@ export interface VocabSet {
   description: string;
   items: VocabItem[];
   difficulty: Difficulty;
+  // --- Community Fields ---
+  isPublic?: boolean;
+  creatorName?: string;
+  cloneCount?: number;
+  publishedAt?: string;
+  originalSetId?: string; // If this set is a clone
 }
 
 // --- New Quiz History Type ---
@@ -61,12 +77,15 @@ export type View =
   | { view: 'FLASHCARDS'; setId: string }
   | { view: 'QUIZ'; setId: string; quizType: 'standard' | 'review'; questionTypes?: QuestionType[] }
   | { view: 'QUIZ_RESULT'; setId: string; result: QuizResultType; quizType: 'standard' | 'review'; questionTypes?: QuestionType[] }
-  | { view: 'PROGRESS'; setId: string };
+  | { view: 'PROGRESS'; setId: string }
+  | { view: 'COMMUNITY' }
+  | { view: 'PUBLIC_SET_PREVIEW'; setId: string };
 
 export interface AppState {
   user: User | null;
   vocabSets: VocabSet[];
-  quizHistory: QuizHistory[]; // Added quiz history
+  publicSets: VocabSet[]; // For community page
+  quizHistory: QuizHistory[];
   currentView: View;
   isLoading: boolean;
 }
@@ -74,6 +93,7 @@ export interface AppState {
 export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
+  | { type: 'UPDATE_USER'; payload: Partial<User> }
   | { type: 'SET_VIEW'; payload: View }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SETS_LOADED'; payload: VocabSet[] }
@@ -81,4 +101,5 @@ export type Action =
   | { type: 'UPDATE_SET'; payload: VocabSet }
   | { type: 'DELETE_SET'; payload: string } // by setId (_id)
   | { type: 'HISTORY_LOADED'; payload: QuizHistory[] }
-  | { type: 'ADD_HISTORY_ITEM'; payload: QuizHistory };
+  | { type: 'ADD_HISTORY_ITEM'; payload: QuizHistory }
+  | { type: 'PUBLIC_SETS_LOADED'; payload: VocabSet[] };

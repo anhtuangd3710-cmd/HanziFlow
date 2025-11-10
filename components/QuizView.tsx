@@ -218,7 +218,7 @@ const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
             questions: updatedQuestions
         };
 
-        // Save result to backend before showing the result screen
+        // Save result to backend for SRS and gamification processing
         await saveQuizResult(setId, result);
 
         setView({ view: 'QUIZ_RESULT', setId, result, quizType, questionTypes });

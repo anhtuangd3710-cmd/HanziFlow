@@ -7,6 +7,7 @@ import { TrashIcon } from './icons/TrashIcon';
 import { StarIcon } from './icons/StarIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { ChartBarIcon } from './icons/ChartBarIcon';
+import { GlobeIcon } from './icons/GlobeIcon';
 
 interface VocabSetCardProps {
   set: VocabSet;
@@ -33,7 +34,6 @@ const VocabSetCard: React.FC<VocabSetCardProps> = ({ set, onStudy, onQuiz, onRev
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-        // FIX: Corrected a typo from `quizMenu_current_contains` to `quizMenuRef.current.contains` to properly detect clicks outside the quiz menu dropdown.
         if (quizMenuRef.current && !quizMenuRef.current.contains(event.target as Node)) {
             setIsQuizMenuOpen(false);
         }
@@ -53,7 +53,10 @@ const VocabSetCard: React.FC<VocabSetCardProps> = ({ set, onStudy, onQuiz, onRev
     <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col justify-between hover:shadow-xl transition-shadow duration-300">
       <div>
         <div className="flex justify-between items-start">
-            <h3 className="text-xl font-bold text-gray-900 pr-2">{set.title}</h3>
+            <h3 className="text-xl font-bold text-gray-900 pr-2 flex items-center gap-2">
+                {set.title}
+                {set.isPublic && <GlobeIcon size={18} className="text-gray-400" title="This set is public" />}
+            </h3>
             <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${difficultyColors[set.difficulty]}`}>
                 {set.difficulty}
             </span>

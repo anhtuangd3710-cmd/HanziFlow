@@ -1,5 +1,3 @@
-
-
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
 import { VocabSet, VocabItem, Difficulty } from '../types';
@@ -11,6 +9,7 @@ import { SparkleIcon } from './icons/SparkleIcon';
 import { generateExampleSentence } from '../services/geminiService';
 import Spinner from './Spinner';
 import { FileTextIcon } from './icons/FileTextIcon';
+import { GlobeIcon } from './icons/GlobeIcon';
 
 interface Props {
   set: VocabSet | null;
@@ -62,11 +61,9 @@ const toneMap: { [key: string]: { [tone: string]: string } } = {
 const convertNumberedPinyin = (input: string): string => {
   const lowerInput = input.toLowerCase();
   
-  // Split by spaces first, then process each part
   const parts = lowerInput.split(/\s+/);
   
   const processedParts = parts.map(part => {
-    // Match all syllables with tone numbers in the part (e.g., "ni3hao3ma" -> ["ni3", "hao3", "ma"])
     const syllablePattern = /([a-züv]+[1-5]?)/g;
     const syllables = part.match(syllablePattern) || [part];
     
@@ -76,7 +73,6 @@ const convertNumberedPinyin = (input: string): string => {
       
       const [, letters, tone] = match;
       
-      // Find which vowel gets the tone mark (priority: a, o, e, iu, then other vowels)
       let toneIndex = -1;
       if (letters.includes('a')) toneIndex = letters.indexOf('a');
       else if (letters.includes('o')) toneIndex = letters.indexOf('o');
@@ -104,6 +100,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   const [title, setTitle] = useState(set?.title || '');
   const [description, setDescription] = useState(set?.description || '');
   const [difficulty, setDifficulty] = useState<Difficulty>(set?.difficulty || 'Medium');
+  const [isPublic, setIsPublic] = useState(set?.isPublic || false);
   const [items, setItems] = useState<VocabItem[]>(set?.items || []);
   const [newItem, setNewItem] = useState({ hanzi: '', pinyin: '', meaning: '', exampleSentence: '' });
   const [generatingIndex, setGeneratingIndex] = useState<number | 'new' | null>(null);
@@ -113,20 +110,19 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   if (!context) return null;
   const { state, saveSet } = context;
 
-  // This effect syncs the modal's internal state with the `set` prop.
-  // This is a robustness improvement to prevent stale state.
   useEffect(() => {
     if (set) {
       setTitle(set.title);
       setDescription(set.description);
       setItems(set.items);
       setDifficulty(set.difficulty);
+      setIsPublic(set.isPublic || false);
     } else {
-      // Reset for "Create New" mode when the modal is opened without a set
       setTitle('');
       setDescription('');
       setItems([]);
       setDifficulty('Medium');
+      setIsPublic(false);
     }
   }, [set]);
 
@@ -138,7 +134,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   };
 
   const handlePinyinBlur = (value: string, updater: (newValue: string) => void) => {
-      // Check if the value contains numbers, indicating it might be numeric pinyin
       if (/\d/.test(value)) {
           const converted = convertNumberedPinyin(value);
           updater(converted);
@@ -155,8 +150,9 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
         title,
         description,
         difficulty,
+        isPublic,
         items,
-        ...(set && { _id: set._id }) // Include _id only if it exists (for updates)
+        ...(set && { _id: set._id })
     };
     
     await saveSet(setToSave);
@@ -217,7 +213,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     reader.onload = (e) => {
         const text = e.target?.result as string;
         try {
-            // Remove BOM and filter out empty lines
             const cleanedText = text.startsWith('\uFEFF') ? text.substring(1) : text;
             let lines = cleanedText.split(/\r?\n/).filter(line => line.trim() !== '');
 
@@ -226,7 +221,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               return;
             }
             
-            // Remove header if it exists
             if (lines[0] && lines[0].toLowerCase().includes('hanzi')) {
                 lines.shift();
             }
@@ -236,11 +230,9 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               return;
             }
 
-            // --- Delimiter Detection Logic ---
-            const firstLine = lines[0];
             let delimiter = ',';
+            const firstLine = lines[0];
             const partsByComma = parseCsvLine(firstLine, ',');
-            // If comma parsing results in one column and semicolons exist, try semicolon
             if (partsByComma.length === 1 && firstLine.includes(';')) {
                 const partsBySemicolon = parseCsvLine(firstLine, ';');
                 if (partsBySemicolon.length > 1) {
@@ -278,7 +270,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
         showToast("Error: Failed to read the file.");
     };
     reader.readAsText(file);
-    event.target.value = ''; // Reset file input to allow re-uploading the same file
+    event.target.value = '';
   };
   
   const handleExportCSV = () => {
@@ -331,8 +323,17 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-          <div className="p-6 border-b">
+          <div className="p-6 border-b flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-800">{set ? 'Edit Set' : 'Create New Set'}</h2>
+            {!set?.originalSetId && (
+                <div className="flex items-center">
+                    <span className="mr-3 text-sm font-medium text-gray-700">Make Publicly Available</span>
+                    <label htmlFor="isPublicToggle" className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="isPublicToggle" className="sr-only peer" checked={isPublic} onChange={() => setIsPublic(!isPublic)} />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+            )}
           </div>
           <div className="p-6 space-y-4 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -401,12 +402,13 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
                                   className="border p-2 rounded-md md:col-span-2"
                               />
                               <input type="text" value={item.meaning} placeholder="Meaning" onChange={e => handleItemChange(index, 'meaning', e.target.value)} className="border p-2 rounded-md md:col-span-2"/>
-                              <button onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-700 p-2 justify-self-center"><TrashIcon size={20}/></button>
+                              <button onClick={() => handleDeleteItem(item.id)} aria-label={`Delete word ${item.hanzi}`} title="Delete word" className="text-red-500 hover:text-red-700 p-2 justify-self-center"><TrashIcon size={20}/></button>
                           </div>
                           <div className="flex items-center mt-2">
                                <textarea value={item.exampleSentence || ''} placeholder="Example sentence" onChange={e => handleItemChange(index, 'exampleSentence', e.target.value)} className="w-full border p-2 rounded-md" rows={3}/>
                                <button 
                                   onClick={() => handleGenerateExample(index)} 
+                                  aria-label={`Generate example for ${item.hanzi}`}
                                   className="ml-2 p-2 h-10 w-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 disabled:bg-gray-200 disabled:cursor-not-allowed"
                                   disabled={generatingIndex !== null || !item.hanzi || !item.pinyin || !item.meaning}
                                   title="Generate Example with AI"
@@ -434,6 +436,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
                       <textarea value={newItem.exampleSentence || ''} onChange={e => setNewItem(prev => ({...prev, exampleSentence: e.target.value}))} placeholder="Example: 这是我的新书 (zhè shì wǒ de xīn shū)" className="w-full border p-2 rounded-md" rows={3}/>
                       <button 
                           onClick={() => handleGenerateExample('new')} 
+                          aria-label="Generate example for new word"
                           className="ml-2 p-2 h-10 w-10 flex-shrink-0 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 disabled:bg-gray-200 disabled:cursor-not-allowed"
                           disabled={generatingIndex !== null || !newItem.hanzi || !newItem.pinyin || !newItem.meaning}
                           title="Generate Example with AI"
