@@ -1,15 +1,15 @@
+
 import React, { useContext, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 
-interface Props {
-  setId: string;
-}
-
-const ProgressView: React.FC<Props> = ({ setId }) => {
+const ProgressView: React.FC = () => {
+  const { setId } = useParams<{ setId: string }>();
+  const navigate = useNavigate();
   const context = useContext(AppContext);
 
   if (!context) return <div>Loading...</div>;
-  const { state, setView } = context;
+  const { state } = context;
 
   const set = useMemo(() => state.vocabSets.find(s => s._id === setId), [state.vocabSets, setId]);
   const historyForSet = useMemo(() =>
@@ -23,7 +23,7 @@ const ProgressView: React.FC<Props> = ({ setId }) => {
     return (
       <div className="text-center p-8">
         <h2 className="text-xl font-semibold">Set not found.</h2>
-        <button onClick={() => setView({ view: 'DASHBOARD' })} className="mt-4 text-blue-500 underline">
+        <button onClick={() => navigate('/')} className="mt-4 text-blue-500 underline">
           Back to Dashboard
         </button>
       </div>
@@ -41,7 +41,7 @@ const ProgressView: React.FC<Props> = ({ setId }) => {
           <h1 className="text-3xl font-bold text-gray-800">{set.title}</h1>
           <p className="text-gray-500">Progress Overview</p>
         </div>
-        <button onClick={() => setView({ view: 'DASHBOARD' })} className="py-2 px-4 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
+        <button onClick={() => navigate('/')} className="py-2 px-4 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
           ← Back to Dashboard
         </button>
       </div>

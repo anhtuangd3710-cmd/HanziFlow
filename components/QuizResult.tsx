@@ -1,6 +1,7 @@
-import React, { useContext } from 'react';
+
+import React from 'react';
+import { useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { QuizResultType, QuestionType } from '../types';
-import { AppContext } from '../context/AppContext';
 
 const toneMap: { [key: string]: { [tone: string]: string } } = {
   'a': { '1': 'ā', '2': 'á', '3': 'ǎ', '4': 'à', '5': 'a' },
@@ -54,18 +55,23 @@ const convertNumberedPinyin = (input: string): string => {
   return processedParts.join(' ');
 };
 
-interface Props {
-  quizResult: QuizResultType;
-  setId: string;
-  quizType: 'standard' | 'review';
-  questionTypes?: QuestionType[];
+interface LocationState {
+    quizResult: QuizResultType;
+    quizType: 'standard' | 'review';
+    questionTypes?: QuestionType[];
 }
 
-const QuizResult: React.FC<Props> = ({ quizResult, setId, quizType, questionTypes }) => {
-  const context = useContext(AppContext);
+const QuizResult: React.FC = () => {
+    const { setId } = useParams<{ setId: string }>();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-  if (!context) return null;
-  const { setView } = context;
+    // If location.state is missing (e.g., user refreshed the page), redirect to dashboard.
+    if (!location.state) {
+        return <Navigate to="/" replace />;
+    }
+    const { quizResult, quizType, questionTypes } = location.state as LocationState;
+
 
   const { score, total, questions } = quizResult;
   const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
@@ -78,11 +84,11 @@ const QuizResult: React.FC<Props> = ({ quizResult, setId, quizType, questionType
   }
 
   const handleRetryQuiz = () => {
-    setView({ view: 'QUIZ', setId, quizType, questionTypes });
+    navigate(`/set/${setId}/quiz`, { state: { quizType, questionTypes }, replace: true });
   };
 
   const handleDashboard = () => {
-    setView({ view: 'DASHBOARD' });
+    navigate('/');
   };
 
   return (

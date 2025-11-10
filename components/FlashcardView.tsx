@@ -1,4 +1,6 @@
+
 import React, { useState, useContext, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { VocabItem } from '../types';
 import { speakText } from '../services/geminiService';
@@ -6,15 +8,13 @@ import { Volume2Icon } from './icons/Volume2Icon';
 import { StarIcon } from './icons/StarIcon';
 import { ShuffleIcon } from './icons/ShuffleIcon';
 
-interface Props {
-  setId: string;
-}
-
-const FlashcardView: React.FC<Props> = ({ setId }) => {
+const FlashcardView: React.FC = () => {
+  const { setId } = useParams<{ setId: string }>();
+  const navigate = useNavigate();
   const context = useContext(AppContext);
 
   if (!context) return <div>Loading...</div>;
-  const { state, setView, toggleNeedsReview } = context;
+  const { state, toggleNeedsReview } = context;
 
   const set = useMemo(() => state.vocabSets.find(s => s._id === setId), [state.vocabSets, setId]);
   
@@ -62,15 +62,15 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
 
   const handleToggleReview = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (currentItem) {
+    if (currentItem && setId) {
       toggleNeedsReview(setId, currentItem.id);
     }
   };
 
   const currentItem = shuffledItems[currentIndex];
 
-  if (!set) return <div>Set not found. <button onClick={() => setView({view: 'DASHBOARD'})}>Go back.</button></div>;
-  if (shuffledItems.length === 0) return <div>This set has no words. <button onClick={() => setView({view: 'DASHBOARD'})} className="text-blue-500 underline">Go back.</button></div>;
+  if (!set) return <div>Set not found. <button onClick={() => navigate('/')}>Go back.</button></div>;
+  if (shuffledItems.length === 0) return <div>This set has no words. <button onClick={() => navigate('/')} className="text-blue-500 underline">Go back.</button></div>;
   
 
   return (
@@ -127,7 +127,7 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
         </button>
       </div>
 
-       <button onClick={() => setView({view: 'DASHBOARD'})} className="mt-8 text-gray-600 hover:text-gray-800 font-semibold">
+       <button onClick={() => navigate('/')} className="mt-8 text-gray-600 hover:text-gray-800 font-semibold">
            ← Back to Dashboard
        </button>
         <style>{`

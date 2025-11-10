@@ -1,4 +1,6 @@
+
 import React, { useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import PublicSetCard from './PublicSetCard';
 import Spinner from './Spinner';
@@ -6,6 +8,7 @@ import Spinner from './Spinner';
 const CommunityView: React.FC = () => {
   const context = useContext(AppContext);
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (context) {
@@ -16,7 +19,7 @@ const CommunityView: React.FC = () => {
   if (!context) {
     return <Spinner />;
   }
-  const { state, setView } = context;
+  const { state } = context;
 
   const filteredSets = state.publicSets.filter(set => 
     set.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -52,7 +55,7 @@ const CommunityView: React.FC = () => {
             <PublicSetCard 
                 key={set._id} 
                 set={set} 
-                onPreview={() => setView({ view: 'PUBLIC_SET_PREVIEW', setId: set._id })}
+                onPreview={() => navigate(`/community/set/${set._id}`)}
             />
           ))}
         </div>

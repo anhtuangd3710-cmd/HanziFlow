@@ -1,15 +1,15 @@
+
 import React, { useContext, useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { getPublicSetDetails } from '../services/api';
 import { VocabSet } from '../types';
 import Spinner from './Spinner';
 import { DownloadIcon } from './icons/DownloadIcon';
 
-interface Props {
-  setId: string;
-}
-
-const PublicSetPreview: React.FC<Props> = ({ setId }) => {
+const PublicSetPreview: React.FC = () => {
+  const { setId } = useParams<{ setId: string }>();
+  const navigate = useNavigate();
   const context = useContext(AppContext);
   const [set, setSet] = useState<VocabSet | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +17,7 @@ const PublicSetPreview: React.FC<Props> = ({ setId }) => {
 
   useEffect(() => {
     const fetchSet = async () => {
+      if (!setId) return;
       setIsLoading(true);
       try {
         const fetchedSet = await getPublicSetDetails(setId);
@@ -31,14 +32,17 @@ const PublicSetPreview: React.FC<Props> = ({ setId }) => {
   }, [setId]);
 
   if (!context) return null;
-  const { state, setView, cloneSet } = context;
+  const { state, cloneSet } = context;
 
-  const isAlreadyCloned = state.user?.clonedSets?.includes(setId);
-  const isOwnSet = state.vocabSets.some(s => s._id === setId); // Check if it's one of user's own original sets
+  const isAlreadyCloned = state.user?.clonedSets?.includes(setId || '');
+  const isOwnSet = state.vocabSets.some(s => s._id === setId);
 
-  const handleClone = () => {
-    if (isAlreadyCloned || isOwnSet) return;
-    cloneSet(setId);
+  const handleClone = async () => {
+    if (isAlreadyCloned || isOwnSet || !setId) return;
+    const cloned = await cloneSet(setId);
+    if (cloned) {
+      navigate('/');
+    }
   };
   
   if (isLoading) {
@@ -55,7 +59,7 @@ const PublicSetPreview: React.FC<Props> = ({ setId }) => {
       <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
         <h3 className="text-xl font-semibold text-red-600">Error</h3>
         <p className="text-gray-600 mt-2">{error || "The set could not be found."}</p>
-        <button onClick={() => setView({ view: 'COMMUNITY' })} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <button onClick={() => navigate('/community')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
           Back to Community
         </button>
       </div>
@@ -95,7 +99,7 @@ const PublicSetPreview: React.FC<Props> = ({ setId }) => {
             ))}
         </div>
       </div>
-       <button onClick={() => setView({ view: 'COMMUNITY' })} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold">
+       <button onClick={() => navigate('/community')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold">
            ← Back to Community
        </button>
     </div>

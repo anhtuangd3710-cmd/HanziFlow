@@ -1,15 +1,18 @@
+
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
-import { AppState, Action, User, VocabSet, View, QuizHistory, QuizResultType, VocabItem } from '../types';
+import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem } from '../types';
 import * as api from '../services/api';
 import * as geminiService from '../services/geminiService';
 
 const initialState: AppState = {
-  user: null,
-  vocabSets: [],
-  publicSets: [],
-  quizHistory: [], // Initialize quiz history
-  currentView: { view: 'DASHBOARD' },
-  isLoading: false,
+    user: null,
+    vocabSets: [],
+    publicSets: [],
+    quizHistory: [], // Initialize quiz history
+    isLoading: false,
+    currentView: {
+        view: 'DASHBOARD'
+    }
 };
 
 const appReducer = (state: AppState, action: Action): AppState => {
@@ -21,8 +24,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'UPDATE_USER':
       if (!state.user) return state; // Should not happen if logged in
       return { ...state, user: { ...state.user, ...action.payload } };
-    case 'SET_VIEW':
-      return { ...state, currentView: action.payload };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SETS_LOADED':
@@ -59,15 +60,14 @@ interface AppContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
     logout: () => void;
-    setView: (view: View) => void;
     fetchSets: () => Promise<void>;
-    saveSet: (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => Promise<void>;
+    saveSet: (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => Promise<VocabSet | undefined>;
     deleteSet: (setId: string) => Promise<void>;
     saveQuizResult: (setId: string, result: QuizResultType) => Promise<void>;
     toggleNeedsReview: (setId: string, itemId: string) => Promise<void>;
     generateSetWithAI: (topic: string, count: number) => Promise<VocabItem[] | null>;
     fetchPublicSets: () => Promise<void>;
-    cloneSet: (setId: string) => Promise<void>;
+    cloneSet: (setId: string) => Promise<VocabSet | undefined>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -82,30 +82,11 @@ const getInitialState = (): AppState => {
             localStorage.removeItem('hanziflow_user');
         }
     }
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const viewParam = urlParams.get('view');
-    let currentView: View = { view: 'DASHBOARD' };
-
-    if (user) { // Only allow deep links if logged in
-        if (viewParam === 'community') {
-            currentView = { view: 'COMMUNITY' };
-        }
-        const setIdParam = urlParams.get('setId');
-        if (viewParam === 'public_set_preview' && setIdParam) {
-            currentView = { view: 'PUBLIC_SET_PREVIEW', setId: setIdParam };
-        }
-    }
-
-    return { ...initialState, user, currentView };
+    return { ...initialState, user };
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [state, dispatch] = useReducer(appReducer, getInitialState());
-
-    const setView = (view: View) => {
-        dispatch({ type: 'SET_VIEW', payload: view });
-    };
 
     const login = async (email: string, password: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
@@ -156,7 +137,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, [state.user?.token]);
 
 
-    const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => {
+    const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }): Promise<VocabSet | undefined> => {
         if (!state.user) throw new Error("User not logged in");
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
@@ -166,6 +147,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             } else {
                 dispatch({ type: 'ADD_SET', payload: savedSet });
             }
+            return savedSet;
         } catch(error) {
             console.error("Failed to save set:", error);
             alert((error as Error).message);
@@ -252,7 +234,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return null;
         } catch (error) {
             console.error("AI set generation failed:", error);
-            alert("Failed to generate vocabulary set with AI. Please try again.");
+            // Alert is handled in the service
             return null;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -271,7 +253,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    const cloneSet = async (setId: string) => {
+    const cloneSet = async (setId: string): Promise<VocabSet | undefined> => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const { newSet, updatedUser } = await api.cloneSet(setId);
@@ -286,7 +268,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             
             alert(`Set "${newSet.title}" has been added to your collection!`);
-            setView({ view: 'DASHBOARD' });
+            return newSet;
         } catch (error) {
             console.error("Failed to clone set:", error);
             alert((error as Error).message);
@@ -303,7 +285,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, setView, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, fetchPublicSets, cloneSet }}>
+    <AppContext.Provider value={{ state, login, register, logout, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, fetchPublicSets, cloneSet }}>
       {children}
     </AppContext.Provider>
   );

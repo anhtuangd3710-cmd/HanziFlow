@@ -1,4 +1,6 @@
+
 import React, { useContext } from 'react';
+import { Link } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { FlameIcon } from './icons/FlameIcon';
 import { UsersIcon } from './icons/UsersIcon';
@@ -24,21 +26,19 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
-            <a href="/" className="text-2xl font-bold text-blue-600">
+            <Link to="/" className="text-2xl font-bold text-blue-600">
               HanziFlow
-            </a>
+            </Link>
           </div>
           {user && (
             <div className="flex items-center gap-4 sm:gap-6">
-              <a
-                href="/?view=community"
-                // target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/community"
                 className="flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors"
               >
                 <UsersIcon size={20} />
                 <span className="hidden sm:inline">Community</span>
-              </a>
+              </Link>
 
               <div className="flex items-center gap-2">
                  <FlameIcon className="h-6 w-6 text-orange-500" />

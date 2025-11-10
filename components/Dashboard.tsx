@@ -1,4 +1,6 @@
+
 import React, { useState, useContext, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { VocabSet, QuizHistory, QuestionType } from '../types';
 import VocabSetModal from './VocabSetModal';
@@ -30,9 +32,10 @@ const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [editingSet, setEditingSet] = useState<VocabSet | null>(null);
+  const navigate = useNavigate();
   
   if (!context) return <Spinner />;
-  const { state, deleteSet, setView } = context;
+  const { state, deleteSet } = context;
 
 
   const handleAddNewSet = () => {
@@ -57,20 +60,20 @@ const Dashboard: React.FC = () => {
   }, [deleteSet]);
 
   const handleStudy = useCallback((setId: string) => {
-    setView({ view: 'FLASHCARDS', setId });
-  }, [setView]);
+    navigate(`/set/${setId}/study`);
+  }, [navigate]);
   
   const handleQuiz = useCallback((setId: string, questionTypes?: QuestionType[]) => {
-    setView({ view: 'QUIZ', setId, quizType: 'standard', questionTypes });
-  }, [setView]);
+    navigate(`/set/${setId}/quiz`, { state: { quizType: 'standard', questionTypes } });
+  }, [navigate]);
 
   const handleReviewQuiz = useCallback((setId: string) => {
-    setView({ view: 'QUIZ', setId, quizType: 'review' });
-  }, [setView]);
+    navigate(`/set/${setId}/quiz`, { state: { quizType: 'review' } });
+  }, [navigate]);
 
   const handleProgress = useCallback((setId: string) => {
-    setView({ view: 'PROGRESS', setId });
-  }, [setView]);
+    navigate(`/set/${setId}/progress`);
+  }, [navigate]);
   
   const user = state.user;
   const level = user ? Math.floor(user.xp / 100) + 1 : 1;

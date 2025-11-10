@@ -1,5 +1,7 @@
+
 // FIX: The original file was likely corrupted or incomplete, causing numerous compilation errors. This version restores the component's logic, state management, and render functions.
 import React, { useState, useContext, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
 import { VocabItem, QuizQuestion, QuizResultType, QuestionType } from '../types';
 import { speakText } from '../services/geminiService';
@@ -57,10 +59,9 @@ const convertNumberedPinyin = (input: string): string => {
   return processedParts.join(' ');
 };
 
-interface Props {
-  setId: string;
-  quizType: 'standard' | 'review';
-  questionTypes?: QuestionType[];
+interface LocationState {
+    quizType: 'standard' | 'review';
+    questionTypes?: QuestionType[];
 }
 
 // FIX: shuffleArray moved out of component and defined as a standard generic function
@@ -93,11 +94,16 @@ const playTone = (frequency: number, duration: number, type: OscillatorType = 's
 };
 
 
-const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
+const QuizView: React.FC = () => {
+  const { setId } = useParams<{ setId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { quizType, questionTypes } = (location.state as LocationState) || { quizType: 'standard' };
+  
   const context = useContext(AppContext);
 
   if (!context) return <div>Loading...</div>;
-  const { state, setView, saveQuizResult } = context;
+  const { state, saveQuizResult } = context;
 
   const set = useMemo(() => state.vocabSets.find(s => s._id === setId), [state.vocabSets, setId]);
   
@@ -107,7 +113,7 @@ const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
   const [pinyinInput, setPinyinInput] = useState('');
   
   useEffect(() => {
-    if (set) {
+    if (set && setId) {
       let itemsForQuiz = set.items;
       if (quizType === 'review') {
         itemsForQuiz = set.items.filter(item => item.needsReview);
@@ -176,7 +182,7 @@ const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
       });
       setQuestions(generatedQuestions);
     }
-  }, [set, quizType, questionTypes]);
+  }, [set, quizType, questionTypes, setId]);
 
   const handleSubmitAnswer = (answer: string) => {
     const currentQ = questions[currentQuestionIndex];
@@ -217,11 +223,12 @@ const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
             total: updatedQuestions.length,
             questions: updatedQuestions
         };
+        
+        if (setId) {
+            await saveQuizResult(setId, result);
+        }
 
-        // Save result to backend for SRS and gamification processing
-        await saveQuizResult(setId, result);
-
-        setView({ view: 'QUIZ_RESULT', setId, result, quizType, questionTypes });
+        navigate(`/set/${setId}/result`, { state: { quizResult: result, quizType, questionTypes } });
       }
     }, 1200);
   };
@@ -255,7 +262,7 @@ const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
                     : ` This set only has ${itemsForQuiz.length} word${itemsForQuiz.length === 1 ? '' : 's'}.`
                 }
             </p>
-            <button onClick={() => setView({view: 'DASHBOARD'})} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button onClick={() => navigate('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 Back to Dashboard
             </button>
         </div>
@@ -376,7 +383,7 @@ const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
         
         {renderAnswerArea()}
 
-         <button onClick={() => setView({view: 'DASHBOARD'})} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold">
+         <button onClick={() => navigate('/')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold">
            ← Quit Quiz
        </button>
     </div>

@@ -25,8 +25,8 @@ Chinese sentence (Pinyin)
 English Translation`;
 
     try {
-        // FIX: Per guidelines, API key must be from process.env.VITE_API_KEY.
-        const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
+        // FIX: Per guidelines, API key must be from process.env.API_KEY.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -58,7 +58,7 @@ export const generateVocabSet = async (topic: string, count: number): Promise<an
     const prompt = `Generate a list of ${count} Chinese vocabulary words related to the topic "${topic}". The words should be suitable for a beginner to intermediate learner. For each word, provide the Hanzi, standard Pinyin with correct tone marks, a concise English meaning, and a simple example sentence in Chinese.`;
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -81,6 +81,11 @@ export const generateVocabSet = async (topic: string, count: number): Promise<an
             },
         });
 
+        if (response.promptFeedback?.blockReason) {
+            console.error("AI response was blocked:", response.promptFeedback);
+            throw new Error(`The request was blocked for safety reasons: ${response.promptFeedback.blockReasonMessage || response.promptFeedback.blockReason}`);
+        }
+
         const jsonResponse = extractJsonFromMarkdown(response.text);
         if (!Array.isArray(jsonResponse)) {
             console.error("Parsed JSON is not an array:", jsonResponse);
@@ -90,9 +95,14 @@ export const generateVocabSet = async (topic: string, count: number): Promise<an
 
     } catch (error) {
         console.error("Error generating vocab set:", error);
-        const errorMessage = (error instanceof Error && (error.message.startsWith("Model returned") || error.message.startsWith("AI did not return")))
-            ? "Failed to generate a valid vocabulary set with AI. The AI's response was not in the correct format. Please try a different topic or try again later."
-            : "Failed to generate a vocabulary set with AI. The model may be temporarily unavailable. Please try again later.";
+        let errorMessage = "Failed to generate a vocabulary set with AI. The model may be temporarily unavailable. Please try again later.";
+        if (error instanceof Error) {
+            if (error.message.startsWith("Model returned") || error.message.startsWith("AI did not return")) {
+                errorMessage = "Failed to generate a valid vocabulary set with AI. The AI's response was not in the correct format. Please try a different topic or try again later.";
+            } else if (error.message.startsWith("The request was blocked")) {
+                errorMessage = `AI generation failed: ${error.message}. Please try a different topic.`;
+            }
+        }
         alert(errorMessage);
         return null;
     }
