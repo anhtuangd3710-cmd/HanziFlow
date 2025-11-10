@@ -9,6 +9,7 @@ const Dashboard = lazy(() => import('./components/Dashboard'));
 const FlashcardView = lazy(() => import('./components/FlashcardView'));
 const QuizView = lazy(() => import('./components/QuizView'));
 const QuizResult = lazy(() => import('./components/QuizResult'));
+const ProgressView = lazy(() => import('./components/ProgressView'));
 
 
 const App: React.FC = () => {
@@ -35,9 +36,11 @@ const App: React.FC = () => {
       case 'FLASHCARDS':
         return <FlashcardView setId={state.currentView.setId} />;
       case 'QUIZ':
-        return <QuizView setId={state.currentView.setId} />;
+        return <QuizView setId={state.currentView.setId} quizType={state.currentView.quizType} questionTypes={state.currentView.questionTypes} />;
       case 'QUIZ_RESULT':
-          return <QuizResult quizResult={state.currentView.result} setId={state.currentView.setId} />;
+          return <QuizResult quizResult={state.currentView.result} setId={state.currentView.setId} quizType={state.currentView.quizType} questionTypes={state.currentView.questionTypes} />;
+      case 'PROGRESS':
+        return <ProgressView setId={state.currentView.setId} />;
       default:
         return <Dashboard />;
     }

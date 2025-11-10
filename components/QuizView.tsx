@@ -1,334 +1,3 @@
-// import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
-// import { AppContext } from '../context/AppContext';
-// import { VocabItem, QuizQuestion, QuizResultType, QuestionType } from '../types';
-// import { speakText } from '../services/geminiService';
-// import { Volume2Icon } from './icons/Volume2Icon';
-// import Spinner from './Spinner';
-
-// interface Props {
-//   setId: string;
-// }
-
-// const QuizView: React.FC<Props> = ({ setId }) => {
-//   const context = useContext(AppContext);
-
-//   if (!context) return <div>Loading...</div>;
-//   const { state, setView } = context;
-
-//   const set = useMemo(() => 
-//     state.vocabSets.find(s => s._id === setId), 
-//     [state.vocabSets, setId]
-//   );
-  
-//   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-//   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-//   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-//   const [pinyinInput, setPinyinInput] = useState('');
-//   const [isTransitioning, setIsTransitioning] = useState(false);
-  
-//   const shuffleArray = useCallback(<T,>(array: T[]): T[] => {
-//     return [...array].sort(() => Math.random() - 0.5);
-//   }, []);
-
-//   // Generate quiz questions
-//   useEffect(() => {
-//     if (!set || set.items.length < 4) return;
-
-//     const questionTypes: QuestionType[] = ['meaning', 'hanzi', 'pinyin'];
-//     const numQuestions = Math.min(10, set.items.length);
-//     const shuffled = shuffleArray(set.items).slice(0, numQuestions);
-    
-//     const generatedQuestions: QuizQuestion[] = shuffled.map(item => {
-//       const type = questionTypes[Math.floor(Math.random() * questionTypes.length)];
-      
-//       switch (type) {
-//         case 'hanzi': {
-//           const otherItems = set.items.filter(i => i.id !== item.id);
-//           // Check if we have enough items for wrong options
-//           if (otherItems.length < 3) {
-//             // Fallback to meaning type if not enough items
-//             const wrongOptions = shuffleArray(otherItems).slice(0, Math.min(3, otherItems.length)).map(i => i.meaning);
-//             const options = shuffleArray([item.meaning, ...wrongOptions]);
-//             return { type: 'meaning', vocabItem: item, options, correctAnswer: item.meaning };
-//           }
-//           const wrongOptions = shuffleArray(otherItems).slice(0, 3).map(i => i.hanzi);
-//           const options = shuffleArray([item.hanzi, ...wrongOptions]);
-//           return { type, vocabItem: item, options, correctAnswer: item.hanzi };
-//         }
-//         case 'pinyin': {
-//           return { type, vocabItem: item, options: [], correctAnswer: item.pinyin };
-//         }
-//         case 'meaning':
-//         default: {
-//           const otherItems = set.items.filter(i => i.id !== item.id);
-//           if (otherItems.length < 3) {
-//             const wrongOptions = shuffleArray(otherItems).slice(0, Math.min(3, otherItems.length)).map(i => i.meaning);
-//             const options = shuffleArray([item.meaning, ...wrongOptions]);
-//             return { type, vocabItem: item, options, correctAnswer: item.meaning };
-//           }
-//           const wrongOptions = shuffleArray(otherItems).slice(0, 3).map(i => i.meaning);
-//           const options = shuffleArray([item.meaning, ...wrongOptions]);
-//           return { type, vocabItem: item, options, correctAnswer: item.meaning };
-//         }
-//       }
-//     });
-    
-//     setQuestions(generatedQuestions);
-//     setCurrentQuestionIndex(0);
-//     setSelectedAnswer(null);
-//     setPinyinInput('');
-//   }, [set, shuffleArray]);
-
-
-
-//   const playTone = (frequency: number, duration: number, type: OscillatorType = 'sine') => {
-//     try {
-//         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-//         if (!audioContext) return;
-//         const oscillator = audioContext.createOscillator();
-//         const gainNode = audioContext.createGain();
-
-//         oscillator.connect(gainNode);
-//         gainNode.connect(audioContext.destination);
-
-//         oscillator.type = type;
-//         oscillator.frequency.value = frequency;
-//         gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-//         gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01); // Quieter volume
-
-//         oscillator.start(audioContext.currentTime);
-//         gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration / 1000);
-//         oscillator.stop(audioContext.currentTime + duration / 1000);
-//     } catch (e) {
-//         console.error("Could not play audio:", e);
-//     }
-// };
-//   const handleSubmitAnswer = useCallback((answer: string) => {
-//     if (isTransitioning || !answer) return;
-    
-//     setIsTransitioning(true);
-//     const updatedQuestions = [...questions];
-//     updatedQuestions[currentQuestionIndex].userAnswer = answer;
-//     setQuestions(updatedQuestions);
-//     setSelectedAnswer(answer);
-//     const currentQ = questions[currentQuestionIndex];
-//      const isCorrect = currentQ.type === 'pinyin'
-//         ? answer.toLowerCase() === currentQ.correctAnswer.toLowerCase()
-//         : answer === currentQ.correctAnswer;
-//      if (isCorrect) {
-//         playTone(600, 100, 'triangle');
-//         setTimeout(() => playTone(900, 100, 'triangle'), 120);
-//     } else {
-//         playTone(200, 200, 'sawtooth');
-//     }
-
-//     setTimeout(() => {
-//       if (currentQuestionIndex < questions.length - 1) {
-//         setCurrentQuestionIndex(prev => prev + 1);
-//         setSelectedAnswer(null);
-//         setPinyinInput('');
-//         setIsTransitioning(false);
-//       } else {
-//         // Calculate final score
-//         const score = updatedQuestions.reduce((acc, q) => {
-//           if (!q.userAnswer) return acc;
-//           const isCorrect = q.type === 'pinyin'
-//             ? q.userAnswer.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim()
-//             : q.userAnswer === q.correctAnswer;
-//           return acc + (isCorrect ? 1 : 0);
-//         }, 0);
-
-//         const result: QuizResultType = {
-//           score,
-//           total: updatedQuestions.length,
-//           questions: updatedQuestions
-//         };
-        
-//         setView({ view: 'QUIZ_RESULT', setId, result });
-//       }
-//     }, 1200);
-//   }, [isTransitioning, questions, currentQuestionIndex, setView, setId]);
-
-//   const handlePinyinSubmit = (e: React.FormEvent) => {
-//     e.preventDefault();
-//     const trimmedInput = pinyinInput.trim();
-//     if (!trimmedInput || isTransitioning) return;
-//     handleSubmitAnswer(trimmedInput);
-//   };
-
-//   const handleSpeak = (text: string) => {
-//     speakText(text);
-//   };
-
-//   // Loading and error states
-//   if (!set) return <div>Set not found.</div>;
-//   if (set.items.length < 4) {
-//     return (
-//       <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-xl">
-//         <h2 className="text-2xl font-bold text-gray-800 mb-4">Cannot Start Quiz</h2>
-//         <p className="text-gray-600 mb-4">You need at least 4 words in a set to start a quiz.</p>
-//         <button 
-//           onClick={() => setView({view: 'DASHBOARD'})} 
-//           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-//         >
-//           ← Back to Dashboard
-//         </button>
-//       </div>
-//     );
-//   }
-//   if (questions.length === 0) return <div>Loading quiz...</div>;
-
-//   const currentQuestion = questions[currentQuestionIndex];
-
-//   const renderQuestionPrompt = () => {
-//     const { type, vocabItem } = currentQuestion;
-
-//     const speakButton = (
-//       <button
-//         onClick={(e) => {
-//           e.stopPropagation();
-//           handleSpeak(vocabItem.hanzi);
-//         }}
-//         className="ml-4 p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-transform transform hover:scale-110 flex items-center justify-center h-12 w-12"
-//         aria-label="Play pronunciation"
-//       >
-//         <Volume2Icon size={24} />
-//       </button>
-//     );
-
-//     if (type === 'meaning' || type === 'pinyin') {
-//       return (
-//         <div className="flex items-center justify-center">
-//           <div>
-//             <p className="text-6xl font-bold">{vocabItem.hanzi}</p>
-//             {type === 'meaning' && (
-//               <p className="text-2xl text-gray-500 mt-2">{vocabItem.pinyin}</p>
-//             )}
-//           </div>
-//           {speakButton}
-//         </div>
-//       );
-//     }
-
-//     if (type === 'hanzi') {
-//       return <p className="text-4xl font-bold text-center">{vocabItem.meaning}</p>;
-//     }
-
-//     return null;
-//   };
-
-//   const renderAnswerArea = () => {
-//     if (currentQuestion.type === 'pinyin') {
-//       const isAnswered = !!selectedAnswer;
-//       const isCorrect = isAnswered && 
-//         selectedAnswer.toLowerCase().trim() === currentQuestion.correctAnswer.toLowerCase().trim();
-      
-//       return (
-//         <div>
-//           <input 
-//             type="text"
-//             value={pinyinInput}
-//             onChange={e => setPinyinInput(e.target.value)}
-//             onKeyPress={(e) => {
-//               if (e.key === 'Enter') {
-//                 e.preventDefault();
-//                 handlePinyinSubmit(e as any);
-//               }
-//             }}
-//             placeholder="Type the pinyin"
-//             disabled={isAnswered}
-//             autoFocus
-//             className={`w-full p-4 border-2 rounded-lg text-center text-lg transition-all duration-300 ${
-//               isAnswered 
-//                 ? (isCorrect ? 'bg-green-200 border-green-500' : 'bg-red-200 border-red-500') 
-//                 : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-//             }`}
-//           />
-//           <button 
-//             onClick={(e) => handlePinyinSubmit(e as any)}
-//             disabled={isAnswered || !pinyinInput.trim()} 
-//             className="mt-4 w-full p-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-//           >
-//             Submit
-//           </button>
-//           {isAnswered && !isCorrect && (
-//             <p className="text-center mt-2 text-lg text-green-700 font-semibold">
-//               Correct answer: {currentQuestion.correctAnswer}
-//             </p>
-//           )}
-//         </div>
-//       );
-//     }
-
-//     return (
-//       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-//         {currentQuestion.options.map((option, index) => {
-//           const isCorrect = option === currentQuestion.correctAnswer;
-//           const isSelected = selectedAnswer === option;
-//           let buttonClass = 'p-4 text-left font-semibold rounded-lg border-2 transition-all duration-300';
-
-//           if (isSelected) {
-//             buttonClass += isCorrect 
-//               ? ' bg-green-200 border-green-500 text-green-800' 
-//               : ' bg-red-200 border-red-500 text-red-800';
-//           } else if (selectedAnswer) {
-//             buttonClass += isCorrect 
-//               ? ' bg-green-200 border-green-500 text-green-800' 
-//               : ' bg-white border-gray-300 text-gray-400';
-//           } else {
-//             buttonClass += ' bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400 cursor-pointer';
-//           }
-
-//           return (
-//             <button
-//               key={index}
-//               onClick={() => handleSubmitAnswer(option)}
-//               disabled={!!selectedAnswer || isTransitioning}
-//               className={buttonClass}
-//             >
-//               {option}
-//             </button>
-//           );
-//         })}
-//       </div>
-//     );
-//   };
-
-//   return (
-//     <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white rounded-lg shadow-xl">
-//       <div className="flex justify-between items-center mb-4">
-//         <h2 className="text-2xl font-bold text-gray-800">{set.title} Quiz</h2>
-//         <div className="text-lg font-semibold text-gray-600">
-//           {currentQuestionIndex + 1} / {questions.length}
-//         </div>
-//       </div>
-      
-//       {/* Progress bar */}
-//       <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
-//         <div 
-//           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-//           style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-//         ></div>
-//       </div>
-
-//       <div className="bg-gray-100 p-8 rounded-lg text-center mb-6 min-h-[180px] flex flex-col justify-center">
-//         {renderQuestionPrompt()}
-//       </div>
-      
-//       {renderAnswerArea()}
-
-//       <button 
-//         onClick={() => setView({view: 'DASHBOARD'})} 
-//         className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold transition-colors"
-//       >
-//         ← Quit Quiz
-//       </button>
-//     </div>
-//   );
-// };
-
-// export default QuizView;
-
 // FIX: The original file was likely corrupted or incomplete, causing numerous compilation errors. This version restores the component's logic, state management, and render functions.
 import React, { useState, useContext, useMemo, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
@@ -337,8 +6,61 @@ import { speakText } from '../services/geminiService';
 import { Volume2Icon } from './icons/Volume2Icon';
 import Spinner from './Spinner';
 
+const toneMap: { [key: string]: { [tone: string]: string } } = {
+  'a': { '1': 'ā', '2': 'á', '3': 'ǎ', '4': 'à', '5': 'a' },
+  'e': { '1': 'ē', '2': 'é', '3': 'ě', '4': 'è', '5': 'e' },
+  'i': { '1': 'ī', '2': 'í', '3': 'ǐ', '4': 'ì', '5': 'i' },
+  'o': { '1': 'ō', '2': 'ó', '3': 'ǒ', '4': 'ò', '5': 'o' },
+  'u': { '1': 'ū', '2': 'ú', '3': 'ǔ', '4': 'ù', '5': 'u' },
+  'ü': { '1': 'ǖ', '2': 'ǘ', '3': 'ǚ', '4': 'ǜ', '5': 'ü' },
+  'v': { '1': 'ǖ', '2': 'ǘ', '3': 'ǚ', '4': 'ǜ', '5': 'ü' },
+};
+
+// Convert numbered pinyin to toned pinyin
+const convertNumberedPinyin = (input: string): string => {
+  const lowerInput = input.toLowerCase();
+  
+  // Split by spaces first, then process each part
+  const parts = lowerInput.split(/\s+/);
+  
+  const processedParts = parts.map(part => {
+    // Match all syllables with tone numbers in the part (e.g., "ni3hao3ma" -> ["ni3", "hao3", "ma"])
+    const syllablePattern = /([a-züv]+[1-5]?)/g;
+    const syllables = part.match(syllablePattern) || [part];
+    
+    return syllables.map(syllable => {
+      const match = syllable.match(/^([a-züv]+)([1-5])$/);
+      if (!match) return syllable;
+      
+      const [, letters, tone] = match;
+      
+      // Find which vowel gets the tone mark (priority: a, o, e, iu, then other vowels)
+      let toneIndex = -1;
+      if (letters.includes('a')) toneIndex = letters.indexOf('a');
+      else if (letters.includes('o')) toneIndex = letters.indexOf('o');
+      else if (letters.includes('e')) toneIndex = letters.indexOf('e');
+      else if (letters.includes('iu')) toneIndex = letters.indexOf('u');
+      else if (letters.includes('i')) toneIndex = letters.indexOf('i');
+      else if (letters.includes('u')) toneIndex = letters.indexOf('u');
+      else if (letters.includes('ü')) toneIndex = letters.indexOf('ü');
+      else if (letters.includes('v')) toneIndex = letters.indexOf('v');
+      
+      if (toneIndex === -1) return syllable;
+      
+      const vowel = letters[toneIndex] === 'v' ? 'v' : letters[toneIndex];
+      const tonedVowel = toneMap[vowel]?.[tone] || vowel;
+      
+      return letters.substring(0, toneIndex) + tonedVowel + letters.substring(toneIndex + 1);
+    }).join('');
+  });
+  
+  return processedParts.join(' ');
+};
+
 interface Props {
   setId: string;
+  quizType: 'standard' | 'review';
+  questionTypes?: QuestionType[];
 }
 
 // FIX: shuffleArray moved out of component and defined as a standard generic function
@@ -371,7 +93,7 @@ const playTone = (frequency: number, duration: number, type: OscillatorType = 's
 };
 
 
-const QuizView: React.FC<Props> = ({ setId }) => {
+const QuizView: React.FC<Props> = ({ setId, quizType, questionTypes }) => {
   const context = useContext(AppContext);
 
   if (!context) return <div>Loading...</div>;
@@ -385,17 +107,58 @@ const QuizView: React.FC<Props> = ({ setId }) => {
   const [pinyinInput, setPinyinInput] = useState('');
   
   useEffect(() => {
-    if (set && set.items.length >= 4) {
-      const questionTypes: QuestionType[] = ['meaning', 'hanzi', 'pinyin'];
-      const shuffled = shuffleArray(set.items).slice(0, 10); // Max 10 questions
+    if (set) {
+      let itemsForQuiz = set.items;
+      if (quizType === 'review') {
+        itemsForQuiz = set.items.filter(item => item.needsReview);
+      }
+      
+      const minWordsNeeded = set.difficulty === 'Hard' ? 5 : (set.difficulty === 'Easy' ? 3 : 4);
+      if (itemsForQuiz.length < minWordsNeeded) {
+        setQuestions([]); 
+        return;
+      }
+
+      const shuffled = shuffleArray(itemsForQuiz).slice(0, 10); // Max 10 questions
       
       const generatedQuestions: QuizQuestion[] = shuffled.map((item: VocabItem) => {
-        const type = questionTypes[Math.floor(Math.random() * questionTypes.length)];
+        let questionTypePool: QuestionType[];
+        let numOptions: number;
+
+        switch (set.difficulty) {
+            case 'Easy':
+                questionTypePool = ['meaning', 'hanzi'];
+                numOptions = 3;
+                break;
+            case 'Hard':
+                // Prioritize pinyin questions by adding more instances to the pool
+                questionTypePool = ['pinyin', 'pinyin', 'hanzi', 'meaning'];
+                numOptions = 5;
+                break;
+            case 'Medium':
+            default:
+                questionTypePool = ['meaning', 'hanzi', 'pinyin'];
+                numOptions = 4;
+                break;
+        }
+
+        // Allow user to override with specific question types from the dropdown
+        let finalQuestionTypePool = questionTypes && questionTypes.length > 0
+            ? questionTypePool.filter(qt => questionTypes.includes(qt))
+            : questionTypePool;
+
+        // If the user's filter results in an empty pool, fall back to the difficulty-based pool
+        if (finalQuestionTypePool.length === 0) {
+            finalQuestionTypePool = questionTypePool;
+        }
+        
+        const type = finalQuestionTypePool[Math.floor(Math.random() * finalQuestionTypePool.length)];
+        const numWrongOptions = numOptions - 1;
         
         switch (type) {
           case 'hanzi': {
-            const otherItems = set.items.filter((i: VocabItem) => i.id !== item.id);
-            const wrongOptions = shuffleArray(otherItems).slice(0, 3).map((i: VocabItem) => i.hanzi);
+            const otherItems = itemsForQuiz.filter((i: VocabItem) => i.id !== item.id);
+            const wrongOptions = shuffleArray(otherItems).slice(0, numWrongOptions).map((i: VocabItem) => i.hanzi);
             const options = shuffleArray([item.hanzi, ...wrongOptions]);
             return { type, vocabItem: item, options, correctAnswer: item.hanzi };
           }
@@ -404,8 +167,8 @@ const QuizView: React.FC<Props> = ({ setId }) => {
           }
           case 'meaning':
           default: {
-            const otherItems = set.items.filter((i: VocabItem) => i.id !== item.id);
-            const wrongOptions = shuffleArray(otherItems).slice(0, 3).map((i: VocabItem) => i.meaning);
+            const otherItems = itemsForQuiz.filter((i: VocabItem) => i.id !== item.id);
+            const wrongOptions = shuffleArray(otherItems).slice(0, numWrongOptions).map((i: VocabItem) => i.meaning);
             const options = shuffleArray([item.meaning, ...wrongOptions]);
             return { type, vocabItem: item, options, correctAnswer: item.meaning };
           }
@@ -413,12 +176,12 @@ const QuizView: React.FC<Props> = ({ setId }) => {
       });
       setQuestions(generatedQuestions);
     }
-  }, [set]);
+  }, [set, quizType, questionTypes]);
 
   const handleSubmitAnswer = (answer: string) => {
     const currentQ = questions[currentQuestionIndex];
     const isCorrect = currentQ.type === 'pinyin'
-        ? answer.toLowerCase() === currentQ.correctAnswer.toLowerCase()
+        ? convertNumberedPinyin(answer).toLowerCase() === currentQ.correctAnswer.toLowerCase()
         : answer === currentQ.correctAnswer;
     
     if (isCorrect) {
@@ -444,7 +207,7 @@ const QuizView: React.FC<Props> = ({ setId }) => {
         const score = updatedQuestions.reduce((acc, q) => {
             if (!q.userAnswer) return acc;
             const correct = q.type === 'pinyin'
-                ? q.userAnswer.toLowerCase() === q.correctAnswer.toLowerCase()
+                ? convertNumberedPinyin(q.userAnswer).toLowerCase() === q.correctAnswer.toLowerCase()
                 : q.userAnswer === q.correctAnswer;
             return acc + (correct ? 1 : 0);
         }, 0);
@@ -458,7 +221,7 @@ const QuizView: React.FC<Props> = ({ setId }) => {
         // Save result to backend before showing the result screen
         await saveQuizResult(setId, result);
 
-        setView({ view: 'QUIZ_RESULT', setId, result });
+        setView({ view: 'QUIZ_RESULT', setId, result, quizType, questionTypes });
       }
     }, 1200);
   };
@@ -474,7 +237,31 @@ const QuizView: React.FC<Props> = ({ setId }) => {
   };
 
   if (!set) return <div>Set not found.</div>;
-  if (set.items.length < 4) return <div>You need at least 4 words in a set to start a quiz.</div>;
+  
+  const itemsForQuiz = quizType === 'review' 
+    ? set.items.filter(item => item.needsReview) 
+    : set.items;
+
+  const minWordsNeeded = set.difficulty === 'Hard' ? 5 : (set.difficulty === 'Easy' ? 3 : 4);
+  
+  if (itemsForQuiz.length < minWordsNeeded) {
+    return (
+        <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
+            <h3 className="text-xl font-semibold text-gray-700">Not Enough Words</h3>
+            <p className="text-gray-500 mt-2">
+                A quiz with '{set.difficulty}' difficulty needs at least {minWordsNeeded} words.
+                {quizType === 'review' 
+                    ? ` You currently have ${itemsForQuiz.length} word${itemsForQuiz.length === 1 ? '' : 's'} marked for review.`
+                    : ` This set only has ${itemsForQuiz.length} word${itemsForQuiz.length === 1 ? '' : 's'}.`
+                }
+            </p>
+            <button onClick={() => setView({view: 'DASHBOARD'})} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Back to Dashboard
+            </button>
+        </div>
+    );
+  }
+  
   if (questions.length === 0) return <div><Spinner /> Loading quiz...</div>;
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -521,7 +308,7 @@ const QuizView: React.FC<Props> = ({ setId }) => {
   const renderAnswerArea = () => {
     if (currentQuestion.type === 'pinyin') {
         const isAnswered = !!selectedAnswer;
-        const isCorrect = isAnswered && selectedAnswer.toLowerCase() === currentQuestion.correctAnswer.toLowerCase();
+        const isCorrect = isAnswered && convertNumberedPinyin(selectedAnswer).toLowerCase() === currentQuestion.correctAnswer.toLowerCase();
         return (
             <form onSubmit={handlePinyinSubmit}>
                 <input 
@@ -542,8 +329,10 @@ const QuizView: React.FC<Props> = ({ setId }) => {
         )
     }
 
+    const gridCols = currentQuestion.options.length > 4 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
+
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
             {currentQuestion.options.map((option, index) => {
                 const isCorrect = option === currentQuestion.correctAnswer;
                 const isSelected = selectedAnswer === option;
@@ -575,7 +364,7 @@ const QuizView: React.FC<Props> = ({ setId }) => {
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white rounded-lg shadow-xl">
         <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">{set.title} Quiz</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{set.title} {quizType === 'review' ? 'Review' : ''} Quiz</h2>
             <div className="text-lg font-semibold text-gray-600">
                 
                 {currentQuestionIndex + 1} / {questions.length}

@@ -3,6 +3,8 @@ import { AppContext } from '../context/AppContext';
 import { VocabItem } from '../types';
 import { speakText } from '../services/geminiService';
 import { Volume2Icon } from './icons/Volume2Icon';
+import { StarIcon } from './icons/StarIcon';
+import { ShuffleIcon } from './icons/ShuffleIcon';
 
 interface Props {
   setId: string;
@@ -12,7 +14,7 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
   const context = useContext(AppContext);
 
   if (!context) return <div>Loading...</div>;
-  const { state, setView } = context;
+  const { state, setView, toggleNeedsReview } = context;
 
   const set = useMemo(() => state.vocabSets.find(s => s._id === setId), [state.vocabSets, setId]);
   
@@ -21,9 +23,17 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
   const [shuffledItems, setShuffledItems] = useState<VocabItem[]>([]);
 
   React.useEffect(() => {
-    if (set) {
-      // Shuffle the items array
+    if (set && shuffledItems.length === 0) { // Only shuffle once at the beginning
       setShuffledItems([...set.items].sort(() => Math.random() - 0.5));
+    } else if (set) {
+      // If the set items have changed (e.g., from a review toggle), update the item in our shuffled list
+      // without changing the order, preserving the study flow.
+      setShuffledItems(currentShuffled => {
+        return currentShuffled.map(shuffledItem => {
+          const updatedItem = set.items.find(item => item.id === shuffledItem.id);
+          return updatedItem || shuffledItem;
+        });
+      });
     }
   }, [set]);
 
@@ -33,10 +43,28 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % shuffledItems.length);
     }, 150); // wait for flip animation
   };
+  
+  const handleShuffle = () => {
+    if (set) {
+        setIsFlipped(false);
+        // Timeout allows the card to flip back before the content changes
+        setTimeout(() => {
+            setShuffledItems([...set.items].sort(() => Math.random() - 0.5));
+            setCurrentIndex(0);
+        }, 150);
+    }
+  };
 
   const handleSpeak = (e: React.MouseEvent, text: string) => {
     e.stopPropagation(); // Prevent card from flipping when clicking the button
     speakText(text);
+  };
+
+  const handleToggleReview = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (currentItem) {
+      toggleNeedsReview(setId, currentItem.id);
+    }
   };
 
   const currentItem = shuffledItems[currentIndex];
@@ -71,6 +99,14 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
           </div>
           {/* Back of card */}
           <div className="absolute w-full h-full backface-hidden bg-blue-500 text-white rounded-lg shadow-xl flex flex-col items-center justify-center p-6 cursor-pointer rotate-y-180">
+            <button
+                onClick={handleToggleReview}
+                className={`absolute top-4 right-4 p-2 rounded-full transition-colors ${currentItem?.needsReview ? 'text-yellow-400 hover:text-yellow-300' : 'text-white/70 hover:text-white'}`}
+                aria-label="Mark for review"
+                title={currentItem?.needsReview ? "Unmark from review" : "Mark for review"}
+            >
+                <StarIcon size={28} filled={!!currentItem?.needsReview} />
+            </button>
             <div className="text-center">
                 <p className="text-4xl font-bold">{currentItem.meaning}</p>
                 {currentItem.exampleSentence && (
@@ -81,8 +117,14 @@ const FlashcardView: React.FC<Props> = ({ setId }) => {
         </div>
       </div>
       
-      <div className="mt-8 flex w-full justify-around">
-        <button onClick={goNext} className="w-48 py-3 px-6 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-colors">Next Card</button>
+      <div className="mt-8 flex w-full justify-center gap-4">
+        <button onClick={handleShuffle} className="w-48 flex items-center justify-center py-3 px-6 bg-gray-500 text-white font-bold rounded-lg shadow-md hover:bg-gray-600 transition-colors">
+            <ShuffleIcon size={20} className="mr-2" />
+            Shuffle
+        </button>
+        <button onClick={goNext} className="w-48 py-3 px-6 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+            Next Card
+        </button>
       </div>
 
        <button onClick={() => setView({view: 'DASHBOARD'})} className="mt-8 text-gray-600 hover:text-gray-800 font-semibold">

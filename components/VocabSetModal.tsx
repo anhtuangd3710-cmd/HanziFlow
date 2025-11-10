@@ -1,6 +1,8 @@
+
+
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
-import { VocabSet, VocabItem } from '../types';
+import { VocabSet, VocabItem, Difficulty } from '../types';
 import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { UploadIcon } from './icons/UploadIcon';
@@ -15,7 +17,37 @@ interface Props {
   onClose: () => void;
 }
 
-// Manual pinyin tone conversion map
+// Helper function to parse a single line of a CSV, handling quoted fields.
+const parseCsvLine = (row: string, delimiter: string): string[] => {
+    const values = [];
+    let current = '';
+    let inQuote = false;
+    for (let i = 0; i < row.length; i++) {
+        const char = row[i];
+        if (char === '"') {
+            if (inQuote && row[i+1] === '"') { // Handle "" escape sequence for a quote inside a field
+                current += '"';
+                i++;
+            } else {
+                inQuote = !inQuote;
+            }
+        } else if (char === delimiter && !inQuote) {
+            values.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    values.push(current);
+    return values.map(val => {
+        let cleaned = val.trim();
+        if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+            cleaned = cleaned.slice(1, -1);
+        }
+        return cleaned.replace(/""/g, '"');
+    });
+};
+
 const toneMap: { [key: string]: { [tone: string]: string } } = {
   'a': { '1': 'ā', '2': 'á', '3': 'ǎ', '4': 'à', '5': 'a' },
   'e': { '1': 'ē', '2': 'é', '3': 'ě', '4': 'è', '5': 'e' },
@@ -67,41 +99,11 @@ const convertNumberedPinyin = (input: string): string => {
   return processedParts.join(' ');
 };
 
-// Helper function to parse a single line of a CSV, handling quoted fields.
-const parseCsvLine = (row: string, delimiter: string): string[] => {
-    const values = [];
-    let current = '';
-    let inQuote = false;
-    for (let i = 0; i < row.length; i++) {
-        const char = row[i];
-        if (char === '"') {
-            if (inQuote && row[i+1] === '"') {
-                current += '"';
-                i++;
-            } else {
-                inQuote = !inQuote;
-            }
-        } else if (char === delimiter && !inQuote) {
-            values.push(current);
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    values.push(current);
-    return values.map(val => {
-        let cleaned = val.trim();
-        if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-            cleaned = cleaned.slice(1, -1);
-        }
-        return cleaned.replace(/""/g, '"');
-    });
-};
-
 const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   const context = useContext(AppContext);
   const [title, setTitle] = useState(set?.title || '');
   const [description, setDescription] = useState(set?.description || '');
+  const [difficulty, setDifficulty] = useState<Difficulty>(set?.difficulty || 'Medium');
   const [items, setItems] = useState<VocabItem[]>(set?.items || []);
   const [newItem, setNewItem] = useState({ hanzi: '', pinyin: '', meaning: '', exampleSentence: '' });
   const [generatingIndex, setGeneratingIndex] = useState<number | 'new' | null>(null);
@@ -111,15 +113,20 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   if (!context) return null;
   const { state, saveSet } = context;
 
+  // This effect syncs the modal's internal state with the `set` prop.
+  // This is a robustness improvement to prevent stale state.
   useEffect(() => {
     if (set) {
       setTitle(set.title);
       setDescription(set.description);
       setItems(set.items);
+      setDifficulty(set.difficulty);
     } else {
+      // Reset for "Create New" mode when the modal is opened without a set
       setTitle('');
       setDescription('');
       setItems([]);
+      setDifficulty('Medium');
     }
   }, [set]);
 
@@ -131,6 +138,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   };
 
   const handlePinyinBlur = (value: string, updater: (newValue: string) => void) => {
+      // Check if the value contains numbers, indicating it might be numeric pinyin
       if (/\d/.test(value)) {
           const converted = convertNumberedPinyin(value);
           updater(converted);
@@ -146,8 +154,9 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     const setToSave = {
         title,
         description,
+        difficulty,
         items,
-        ...(set && { _id: set._id })
+        ...(set && { _id: set._id }) // Include _id only if it exists (for updates)
     };
     
     await saveSet(setToSave);
@@ -195,6 +204,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     }
   };
 
+
   const handleTriggerImport = () => {
     fileInputRef.current?.click();
   };
@@ -207,6 +217,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     reader.onload = (e) => {
         const text = e.target?.result as string;
         try {
+            // Remove BOM and filter out empty lines
             const cleanedText = text.startsWith('\uFEFF') ? text.substring(1) : text;
             let lines = cleanedText.split(/\r?\n/).filter(line => line.trim() !== '');
 
@@ -215,6 +226,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               return;
             }
             
+            // Remove header if it exists
             if (lines[0] && lines[0].toLowerCase().includes('hanzi')) {
                 lines.shift();
             }
@@ -224,9 +236,11 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
               return;
             }
 
+            // --- Delimiter Detection Logic ---
             const firstLine = lines[0];
             let delimiter = ',';
             const partsByComma = parseCsvLine(firstLine, ',');
+            // If comma parsing results in one column and semicolons exist, try semicolon
             if (partsByComma.length === 1 && firstLine.includes(';')) {
                 const partsBySemicolon = parseCsvLine(firstLine, ';');
                 if (partsBySemicolon.length > 1) {
@@ -264,7 +278,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
         showToast("Error: Failed to read the file.");
     };
     reader.readAsText(file);
-    event.target.value = '';
+    event.target.value = ''; // Reset file input to allow re-uploading the same file
   };
   
   const handleExportCSV = () => {
@@ -310,7 +324,8 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+};
+
 
   return (
     <>
@@ -320,10 +335,31 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
             <h2 className="text-2xl font-bold text-gray-800">{set ? 'Edit Set' : 'Create New Set'}</h2>
           </div>
           <div className="p-6 space-y-4 overflow-y-auto">
-              <div>
-                  <label className="block text-sm font-medium text-gray-700">Title</label>
-                  <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">Title</label>
+                      <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700">Difficulty</label>
+                       <div className="mt-2 flex space-x-4">
+                          {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map(level => (
+                              <label key={level} className="flex items-center">
+                                  <input 
+                                      type="radio" 
+                                      name="difficulty" 
+                                      value={level} 
+                                      checked={difficulty === level} 
+                                      onChange={() => setDifficulty(level)}
+                                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                                  />
+                                  <span className="ml-2 text-sm text-gray-700">{level}</span>
+                              </label>
+                          ))}
+                      </div>
+                  </div>
               </div>
+
               <div>
                   <label className="block text-sm font-medium text-gray-700">Description</label>
                   <textarea value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500" rows={2}/>

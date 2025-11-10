@@ -1,7 +1,7 @@
-import { User, VocabSet } from '../types';
+import { User, VocabSet, QuizHistory } from '../types';
 
-// const API_URL = 'http://localhost:5001/api'; // Your backend URL
-const API_URL = process.env.URL; // Your backend URL
+const API_URL = 'http://localhost:5001/api'; // Your backend URL
+
 // Helper to get the token from localStorage
 const getToken = (): string | null => {
     const storedUser = localStorage.getItem('hanziflow_user');
@@ -96,4 +96,38 @@ export const deleteSet = async (setId: string): Promise<void> => {
     if (!res.ok) {
         throw new Error("Failed to delete set");
     }
+};
+
+// --- Quiz History ---
+export const getQuizHistory = async (): Promise<QuizHistory[]> => {
+    const token = getToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(`${API_URL}/history`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) {
+        throw new Error("Failed to fetch quiz history");
+    }
+    return await res.json();
+};
+
+export const saveQuizResult = async (resultData: { vocabSet: string; score: number; total: number }): Promise<QuizHistory> => {
+    const token = getToken();
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch(`${API_URL}/history`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(resultData),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to save quiz result");
+    }
+    return await res.json();
 };
