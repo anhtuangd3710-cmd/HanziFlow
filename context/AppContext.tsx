@@ -5,14 +5,12 @@ import * as api from '../services/api';
 import * as geminiService from '../services/geminiService';
 
 const initialState: AppState = {
-    user: null,
-    vocabSets: [],
-    publicSets: [],
-    quizHistory: [], // Initialize quiz history
-    isLoading: false,
-    currentView: {
-        view: 'DASHBOARD'
-    }
+  user: null,
+  vocabSets: [],
+  publicSets: [],
+  quizHistory: [],
+  isLoading: false,
+  isRequestingUserApiKey: false,
 };
 
 const appReducer = (state: AppState, action: Action): AppState => {
@@ -22,7 +20,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'LOGOUT':
       return { ...initialState };
     case 'UPDATE_USER':
-      if (!state.user) return state; // Should not happen if logged in
+      if (!state.user) return state;
       return { ...state, user: { ...state.user, ...action.payload } };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
@@ -47,9 +45,10 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'HISTORY_LOADED':
         return { ...state, quizHistory: action.payload };
     case 'ADD_HISTORY_ITEM':
-        // Add to the top of the list and keep the list at a reasonable size
         const updatedHistory = [action.payload, ...state.quizHistory].slice(0, 20);
         return { ...state, quizHistory: updatedHistory };
+    case 'REQUEST_USER_API_KEY':
+        return { ...state, isRequestingUserApiKey: action.payload };
     default:
       return state;
   }
@@ -66,8 +65,10 @@ interface AppContextType {
     saveQuizResult: (setId: string, result: QuizResultType) => Promise<void>;
     toggleNeedsReview: (setId: string, itemId: string) => Promise<void>;
     generateSetWithAI: (topic: string, count: number) => Promise<VocabItem[] | null>;
+    generateExample: (word: { hanzi: string; pinyin: string; meaning: string; }) => Promise<string | null>;
     fetchPublicSets: () => Promise<void>;
     cloneSet: (setId: string) => Promise<VocabSet | undefined>;
+    closeApiKeyModal: () => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -87,6 +88,8 @@ const getInitialState = (): AppState => {
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [state, dispatch] = useReducer(appReducer, getInitialState());
+
+    const closeApiKeyModal = () => dispatch({ type: 'REQUEST_USER_API_KEY', payload: false });
 
     const login = async (email: string, password: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
@@ -220,6 +223,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             alert("Could not update item. Please try again.");
         }
     };
+
+    const generateExample = async (word: { hanzi: string, pinyin: string, meaning: string }): Promise<string | null> => {
+        try {
+            return await geminiService.generateExampleSentence(word);
+        } catch (error) {
+            if (error instanceof Error && error.message === geminiService.API_KEY_FAILURE) {
+                dispatch({ type: 'REQUEST_USER_API_KEY', payload: true });
+            }
+            return null;
+        }
+    };
     
     const generateSetWithAI = async (topic: string, count: number): Promise<VocabItem[] | null> => {
         dispatch({ type: 'SET_LOADING', payload: true });
@@ -233,8 +247,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             return null;
         } catch (error) {
-            console.error("AI set generation failed:", error);
-            // Alert is handled in the service
+            if (error instanceof Error && error.message === geminiService.API_KEY_FAILURE) {
+                dispatch({ type: 'REQUEST_USER_API_KEY', payload: true });
+            }
+            console.error("AI set generation failed in context:", error);
             return null;
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -285,7 +301,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, fetchPublicSets, cloneSet }}>
+    <AppContext.Provider value={{ state, login, register, logout, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal }}>
       {children}
     </AppContext.Provider>
   );

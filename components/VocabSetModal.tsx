@@ -1,3 +1,4 @@
+
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { AppContext } from '../context/AppContext';
 import { VocabSet, VocabItem, Difficulty } from '../types';
@@ -6,7 +7,6 @@ import { TrashIcon } from './icons/TrashIcon';
 import { UploadIcon } from './icons/UploadIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { SparkleIcon } from './icons/SparkleIcon';
-import { generateExampleSentence } from '../services/geminiService';
 import Spinner from './Spinner';
 import { FileTextIcon } from './icons/FileTextIcon';
 import { GlobeIcon } from './icons/GlobeIcon';
@@ -108,7 +108,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   
   if (!context) return null;
-  const { state, saveSet } = context;
+  const { state, saveSet, generateExample } = context;
 
   useEffect(() => {
     if (set) {
@@ -186,7 +186,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     
     setGeneratingIndex(index);
     try {
-        const sentence = await generateExampleSentence(itemSource);
+        const sentence = await generateExample(itemSource);
         
         if (sentence) {
             if (index === 'new') {

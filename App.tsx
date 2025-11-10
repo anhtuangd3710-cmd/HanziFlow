@@ -5,6 +5,7 @@ import { AppContext } from './context/AppContext';
 import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
 import Spinner from './components/Spinner';
+import ApiKeyModal from './components/ApiKeyModal'; // Import the modal
 
 // --- Lazy Load Views ---
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -42,25 +43,28 @@ const App: React.FC = () => {
     );
   }
 
-  const { state } = context;
+  const { state, closeApiKeyModal } = context;
 
   return (
-    <Routes>
-      <Route path="/login" element={state.user ? <Navigate to="/" /> : <AuthScreen />} />
-      <Route
-        path="/*"
-        element={state.user ? <ProtectedLayout /> : <Navigate to="/login" />}
-      >
-        <Route index element={<Dashboard />} />
-        <Route path="set/:setId/study" element={<FlashcardView />} />
-        <Route path="set/:setId/quiz" element={<QuizView />} />
-        <Route path="set/:setId/result" element={<QuizResult />} />
-        <Route path="set/:setId/progress" element={<ProgressView />} />
-        <Route path="community" element={<CommunityView />} />
-        <Route path="community/set/:setId" element={<PublicSetPreview />} />
-        <Route path="*" element={<Navigate to="/" />} /> 
-      </Route>
-    </Routes>
+    <>
+      {state.isRequestingUserApiKey && <ApiKeyModal onClose={closeApiKeyModal} />}
+      <Routes>
+        <Route path="/login" element={state.user ? <Navigate to="/" /> : <AuthScreen />} />
+        <Route
+          path="/*"
+          element={state.user ? <ProtectedLayout /> : <Navigate to="/login" />}
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="set/:setId/study" element={<FlashcardView />} />
+          <Route path="set/:setId/quiz" element={<QuizView />} />
+          <Route path="set/:setId/result" element={<QuizResult />} />
+          <Route path="set/:setId/progress" element={<ProgressView />} />
+          <Route path="community" element={<CommunityView />} />
+          <Route path="community/set/:setId" element={<PublicSetPreview />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Route>
+      </Routes>
+    </>
   );
 };
 

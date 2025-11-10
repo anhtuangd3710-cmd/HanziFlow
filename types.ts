@@ -1,3 +1,4 @@
+
 export interface User {
   _id: string;
   email: string;
@@ -72,29 +73,19 @@ export interface QuizResultType {
     questions: QuizQuestion[];
 }
 
-export type View = 
-  | { view: 'DASHBOARD' }
-  | { view: 'FLASHCARDS'; setId: string }
-  | { view: 'QUIZ'; setId: string; quizType: 'standard' | 'review'; questionTypes?: QuestionType[] }
-  | { view: 'QUIZ_RESULT'; setId: string; result: QuizResultType; quizType: 'standard' | 'review'; questionTypes?: QuestionType[] }
-  | { view: 'PROGRESS'; setId: string }
-  | { view: 'COMMUNITY' }
-  | { view: 'PUBLIC_SET_PREVIEW'; setId: string };
-
 export interface AppState {
   user: User | null;
   vocabSets: VocabSet[];
   publicSets: VocabSet[]; // For community page
   quizHistory: QuizHistory[];
-  currentView: View;
   isLoading: boolean;
+  isRequestingUserApiKey: boolean; // To show the API key modal
 }
 
 export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
   | { type: 'UPDATE_USER'; payload: Partial<User> }
-  | { type: 'SET_VIEW'; payload: View }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SETS_LOADED'; payload: VocabSet[] }
   | { type: 'ADD_SET'; payload: VocabSet }
@@ -102,4 +93,5 @@ export type Action =
   | { type: 'DELETE_SET'; payload: string } // by setId (_id)
   | { type: 'HISTORY_LOADED'; payload: QuizHistory[] }
   | { type: 'ADD_HISTORY_ITEM'; payload: QuizHistory }
-  | { type: 'PUBLIC_SETS_LOADED'; payload: VocabSet[] };
+  | { type: 'PUBLIC_SETS_LOADED'; payload: VocabSet[] }
+  | { type: 'REQUEST_USER_API_KEY'; payload: boolean }; // Action for the modal
