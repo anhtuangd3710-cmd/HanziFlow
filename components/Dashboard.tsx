@@ -10,7 +10,8 @@ import VocabSetCard from './VocabSetCard';
 import { EmptySetIcon } from './icons/EmptySetIcon';
 import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
 import AiSetGeneratorModal from './AiSetGeneratorModal';
-import { FlameIcon } from './icons/FlameIcon';
+import ProgressCard from './ProgressCard';
+import ReviewSessionModal from './ReviewSessionModal';
 
 const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -31,6 +32,8 @@ const Dashboard: React.FC = () => {
   const context = useContext(AppContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [setsForReview, setSetsForReview] = useState<{ setId: string; setTitle: string; dueCount: number }[]>([]);
   const [editingSet, setEditingSet] = useState<VocabSet | null>(null);
   const navigate = useNavigate();
   
@@ -75,8 +78,12 @@ const Dashboard: React.FC = () => {
     navigate(`/set/${setId}/progress`);
   }, [navigate]);
   
+  const handleOpenReviewModal = useCallback((setsForReview: { setId: string; setTitle: string; dueCount: number }[]) => {
+      setSetsForReview(setsForReview);
+      setIsReviewModalOpen(true);
+  }, []);
+
   const user = state.user;
-  const level = user ? Math.floor(user.xp / 100) + 1 : 1;
   const userSets = state.vocabSets; 
 
   if (state.isLoading && userSets.length === 0 && state.quizHistory.length === 0) {
@@ -139,32 +146,12 @@ const Dashboard: React.FC = () => {
       {/* Sidebar: Gamification & History */}
       <div className="lg:col-span-1">
         <div className="sticky top-24 space-y-8">
-           {/* Gamification Status Card */}
            {user && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-2xl font-bold text-gray-800 mb-4">Your Progress</h3>
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-600">Level</span>
-                        <span className="font-bold text-lg text-blue-600">{level}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-600">Total XP</span>
-                        <span className="font-bold text-lg text-green-600">{user.xp}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-600">Current Streak</span>
-                        <div className="flex items-center gap-2">
-                           <FlameIcon className="h-5 w-5 text-orange-500" />
-                           <span className="font-bold text-lg text-orange-600">{user.currentStreak} day{user.currentStreak !== 1 ? 's' : ''}</span>
-                        </div>
-                    </div>
-                     <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-600">Longest Streak</span>
-                        <span className="font-bold text-lg text-red-600">{user.longestStreak} day{user.longestStreak !== 1 ? 's' : ''}</span>
-                    </div>
-                </div>
-            </div>
+              <ProgressCard 
+                user={user}
+                vocabSets={state.vocabSets}
+                onStartReview={handleOpenReviewModal}
+              />
            )}
 
           {/* Quiz History */}
@@ -205,6 +192,14 @@ const Dashboard: React.FC = () => {
             setIsAiModalOpen(false);
             handleEditSet(createdSet); // Open the standard modal for review/editing
           }}
+        />
+      )}
+      {isReviewModalOpen && (
+        <ReviewSessionModal
+            isOpen={isReviewModalOpen}
+            onClose={() => setIsReviewModalOpen(false)}
+            setsForReview={setsForReview}
+            onStartSetReview={handleReviewQuiz}
         />
       )}
     </div>

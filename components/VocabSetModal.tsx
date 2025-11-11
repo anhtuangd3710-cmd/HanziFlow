@@ -1,5 +1,6 @@
 
 import React, { useState, useContext, useRef, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { AppContext } from '../context/AppContext';
 import { VocabSet, VocabItem, Difficulty } from '../types';
 import { PlusIcon } from './icons/PlusIcon';
@@ -15,37 +16,6 @@ interface Props {
   set: VocabSet | null;
   onClose: () => void;
 }
-
-// Helper function to parse a single line of a CSV, handling quoted fields.
-const parseCsvLine = (row: string, delimiter: string): string[] => {
-    const values = [];
-    let current = '';
-    let inQuote = false;
-    for (let i = 0; i < row.length; i++) {
-        const char = row[i];
-        if (char === '"') {
-            if (inQuote && row[i+1] === '"') { // Handle "" escape sequence for a quote inside a field
-                current += '"';
-                i++;
-            } else {
-                inQuote = !inQuote;
-            }
-        } else if (char === delimiter && !inQuote) {
-            values.push(current);
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    values.push(current);
-    return values.map(val => {
-        let cleaned = val.trim();
-        if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-            cleaned = cleaned.slice(1, -1);
-        }
-        return cleaned.replace(/""/g, '"');
-    });
-};
 
 const toneMap: { [key: string]: { [tone: string]: string } } = {
   'a': { '1': 'ā', '2': 'á', '3': 'ǎ', '4': 'à', '5': 'a' },
@@ -211,111 +181,106 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        const text = e.target?.result as string;
         try {
-            const cleanedText = text.startsWith('\uFEFF') ? text.substring(1) : text;
-            let lines = cleanedText.split(/\r?\n/).filter(line => line.trim() !== '');
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            if (lines.length === 0) {
-              showToast("Error: The file appears to be empty.");
-              return;
+            if (jsonData.length < 2) {
+                showToast("Error: The file appears to be empty or has no data rows.");
+                return;
+            }
+
+            const headers = jsonData[0].map(h => String(h).toLowerCase().trim());
+            const hanziIndex = headers.indexOf('hanzi');
+            const pinyinIndex = headers.indexOf('pinyin');
+            const meaningIndex = headers.indexOf('meaning');
+            const exampleIndex = headers.indexOf('examplesentence');
+
+            if (hanziIndex === -1 || pinyinIndex === -1 || meaningIndex === -1) {
+                throw new Error('Import failed: File must contain "Hanzi", "pinyin", and "meaning" columns.');
             }
             
-            if (lines[0] && lines[0].toLowerCase().includes('hanzi')) {
-                lines.shift();
-            }
+            const dataRows = jsonData.slice(1);
 
-            if (lines.length === 0) {
-              showToast("Error: No data rows found in the file.");
-              return;
-            }
+            const newItems: VocabItem[] = dataRows.map((row, index) => {
+                const hanzi = row[hanziIndex];
+                const pinyin = row[pinyinIndex];
+                const meaning = row[meaningIndex];
 
-            let delimiter = ',';
-            const firstLine = lines[0];
-            const partsByComma = parseCsvLine(firstLine, ',');
-            if (partsByComma.length === 1 && firstLine.includes(';')) {
-                const partsBySemicolon = parseCsvLine(firstLine, ';');
-                if (partsBySemicolon.length > 1) {
-                    delimiter = ';';
+                if (!hanzi || !pinyin || !meaning) {
+                    console.warn(`Skipping empty or incomplete row ${index + 2}`);
+                    return null;
                 }
-            }
-            
-            const newItems: VocabItem[] = lines.map((line, index) => {
-                const parts = parseCsvLine(line, delimiter);
-                
-                if (parts.length < 3) {
-                    throw new Error(`Invalid format on line ${index + 1}: Each line must have at least 3 columns (Hanzi, Pinyin, Meaning). Found ${parts.length} using '${delimiter}' as a separator.`);
-                }
-                return {
+
+                const vocabItem: VocabItem = {
                     id: `item-import-${Date.now()}-${index}`,
-                    hanzi: parts[0],
-                    pinyin: parts[1],
-                    meaning: parts[2],
-                    exampleSentence: parts[3] || '',
+                    hanzi: String(hanzi),
+                    pinyin: String(pinyin),
+                    meaning: String(meaning),
                 };
-            });
+
+                if (exampleIndex > -1 && row[exampleIndex]) {
+                    vocabItem.exampleSentence = String(row[exampleIndex]);
+                }
+
+                return vocabItem;
+            }).filter((item): item is VocabItem => item !== null);
 
             if (newItems.length > 0) {
                 setItems(prevItems => [...prevItems, ...newItems]);
                 showToast(`Successfully imported ${newItems.length} items.`);
             } else {
-                showToast("No new items were found in the file.");
+                showToast("No valid new items were found in the file.");
             }
         } catch (error: any) {
-            console.error("CSV Parsing Error:", error);
-            showToast(`Error: ${error.message}`);
+            console.error("Excel Parsing Error:", error);
+            showToast(`${error.message}`);
         }
     };
     reader.onerror = () => {
         showToast("Error: Failed to read the file.");
     };
-    reader.readAsText(file);
-    event.target.value = '';
+    reader.readAsArrayBuffer(file);
+    if (event.target) {
+      event.target.value = '';
+    }
   };
   
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     if (items.length === 0) {
         showToast("There are no items to export.");
         return;
     }
-    const header = "hanzi,pinyin,meaning,exampleSentence\n";
-    const csvContent = items.map(item =>
-        [item.hanzi, item.pinyin, item.meaning, item.exampleSentence || ''].map(field => {
-            const fieldStr = String(field);
-            if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
-                return `"${fieldStr.replace(/"/g, '""')}"`;
-            }
-            return fieldStr;
-        }).join(",")
-    ).join("\n");
 
-    const blob = new Blob([header + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
+    const dataToExport = items.map(item => ({
+        hanzi: item.hanzi,
+        pinyin: item.pinyin,
+        meaning: item.meaning,
+        exampleSentence: item.exampleSentence || '',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Vocabulary");
+    
     const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    link.setAttribute("download", `${safeTitle || 'vocab_set'}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    XLSX.writeFile(workbook, `${safeTitle || 'vocab_set'}.xlsx`);
   };
 
   const handleDownloadTemplate = () => {
-    const header = "hanzi,pinyin,meaning,exampleSentence\n";
-    const example1 = `"你好","ni3 hao3","hello","你好，世界！ (nǐ hǎo, shì jiè!) - Hello, world!"\n`;
-    const example2 = `"谢谢","xie4 xie","thank you","非常感谢你。 (fēi cháng gǎn xiè nǐ) - Thank you very much."\n`;
-    const templateContent = header + example1 + example2;
+    const header = ["hanzi", "pinyin", "meaning", "exampleSentence"];
+    const example1 = ["你好", "ni3 hao3", "hello", "你好，世界！ (nǐ hǎo, shì jiè!) - Hello, world!"];
+    const example2 = ["谢谢", "xie4 xie", "thank you", "非常感谢你。 (fēi cháng gǎn xiè nǐ) - Thank you very much."];
+    const templateData = [header, example1, example2];
 
-    const blob = new Blob([templateContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "hanziflow_template.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const worksheet = XLSX.utils.aoa_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+
+    XLSX.writeFile(workbook, "hanziflow_template.xlsx");
 };
 
 
@@ -374,7 +339,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
                       ref={fileInputRef}
                       onChange={handleFileImport}
                       className="hidden"
-                      accept=".csv,text/csv"
+                      accept=".xlsx, .xls"
                   />
                   <button onClick={handleDownloadTemplate} className="flex items-center text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-3 rounded-md">
                       <FileTextIcon size={16} className="mr-1.5" /> Template
@@ -382,7 +347,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
                   <button onClick={handleTriggerImport} className="flex items-center text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-md">
                       <UploadIcon size={16} className="mr-1.5" /> Import
                   </button>
-                   <button onClick={handleExportCSV} className="flex items-center text-sm bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md">
+                   <button onClick={handleExportExcel} className="flex items-center text-sm bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-3 rounded-md">
                       <DownloadIcon size={16} className="mr-1.5" /> Export
                   </button>
                 </div>

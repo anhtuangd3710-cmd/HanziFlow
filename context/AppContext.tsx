@@ -1,7 +1,7 @@
-
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
 import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem } from '../types';
 import * as api from '../services/api';
+import { AuthError } from '../services/api'; // Import the custom error type
 import * as geminiService from '../services/geminiService';
 
 const initialState: AppState = {
@@ -117,10 +117,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    const logout = () => {
+    const logout = useCallback(() => {
         localStorage.removeItem('hanziflow_user');
         dispatch({ type: 'LOGOUT' });
-    };
+    }, []);
     
     const fetchInitialData = useCallback(async () => {
         if (!state.user?.token) return;
@@ -134,10 +134,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'HISTORY_LOADED', payload: history });
         } catch (error) {
             console.error("Failed to fetch initial data:", error);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            }
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user?.token]);
+    }, [state.user?.token, logout]);
 
 
     const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }): Promise<VocabSet | undefined> => {
@@ -153,7 +157,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return savedSet;
         } catch(error) {
             console.error("Failed to save set:", error);
-            alert((error as Error).message);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            } else {
+                alert((error as Error).message);
+            }
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -167,7 +176,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'DELETE_SET', payload: setId });
         } catch(error) {
             console.error("Failed to delete set:", error);
-            alert((error as Error).message);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            } else {
+                alert((error as Error).message);
+            }
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -193,6 +207,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         } catch (error) {
             console.error("Failed to save quiz result:", error);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            }
         }
     };
     
@@ -220,7 +238,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } catch (error) {
             console.error("Failed to update 'needs review' status:", error);
             dispatch({ type: 'UPDATE_SET', payload: targetSet }); 
-            alert("Could not update item. Please try again.");
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            } else {
+                alert("Could not update item. Please try again.");
+            }
         }
     };
 
@@ -264,7 +287,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'PUBLIC_SETS_LOADED', payload: publicSets });
         } catch (error) {
             console.error("Failed to fetch public sets:", error);
-            alert((error as Error).message);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            } else {
+                alert((error as Error).message);
+            }
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     };
@@ -287,7 +315,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return newSet;
         } catch (error) {
             console.error("Failed to clone set:", error);
-            alert((error as Error).message);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            } else {
+                alert((error as Error).message);
+            }
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
