@@ -3,6 +3,8 @@ import { AppContext } from '../context/AppContext';
 import { VocabSet, VocabItem } from '../types';
 import Spinner from './Spinner';
 import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
+import { HelpCircleIcon } from './icons/HelpCircleIcon';
+import { ChevronDownIcon } from './icons/ChevronDownIcon';
 
 interface Props {
   onClose: () => void;
@@ -15,6 +17,7 @@ const AiSetGeneratorModal: React.FC<Props> = ({ onClose, onSetCreated }) => {
   const [wordCount, setWordCount] = useState(10);
   const [isLoading, setIsLoading] =useState(false);
   const [generatedItems, setGeneratedItems] = useState<VocabItem[] | null>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   if (!context) return null;
   const { saveSet, generateSetWithAI } = context;
@@ -65,6 +68,31 @@ const AiSetGeneratorModal: React.FC<Props> = ({ onClose, onSetCreated }) => {
         {!generatedItems ? (
             <div className="p-6 space-y-4">
                 <p className="text-gray-600">Enter a topic and let AI create a vocabulary set for you. Great for exploring new subjects!</p>
+                
+                {/* Help Section */}
+                <div className="bg-gray-50 rounded-lg border border-gray-200">
+                    <button onClick={() => setIsHelpOpen(!isHelpOpen)} className="w-full flex justify-between items-center p-3 text-left">
+                        <div className="flex items-center">
+                            <HelpCircleIcon className="h-5 w-5 mr-2 text-gray-500"/>
+                            <span className="font-semibold text-gray-700">Pro Tips for Better Results</span>
+                        </div>
+                        <ChevronDownIcon size={20} className={`transition-transform text-gray-500 ${isHelpOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isHelpOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <div className="p-4 border-t text-sm text-gray-600 space-y-3">
+                            <p>The AI is great at generating lists for specific themes. Be as descriptive as you like!</p>
+                            <p><strong className="font-semibold text-gray-800">Important:</strong> Always review the generated words. The AI can sometimes make mistakes with pinyin or provide less common translations.</p>
+                            <p className="font-semibold text-gray-800">Example Prompts:</p>
+                            <ul className="list-disc list-inside space-y-1 pl-2">
+                                <li>Common fruits in China</li>
+                                <li>HSK 3 verbs</li>
+                                <li>Adjectives for describing personality</li>
+                                <li>Words related to business meetings</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label htmlFor="topic" className="block text-sm font-medium text-gray-700">Topic</label>
                     <input

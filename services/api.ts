@@ -1,7 +1,10 @@
-import { User, VocabSet, QuizHistory, QuizResultType } from '../types';
+import { User, VocabSet, QuizHistory, QuizResultType, UserStats } from '../types';
+
+const API_URL = process.env.URL; // Your backend URL
+
+// import { User, VocabSet, QuizHistory, QuizResultType, UserStats } from '../types';
 
 // const API_URL = 'http://localhost:5001/api'; // Your backend URL
-const API_URL = process.env.URL
 
 // Custom error for auth failures
 export class AuthError extends Error {
@@ -88,8 +91,12 @@ export const registerUser = async (name: string, email: string, password: string
 
 
 // --- Vocab Sets ---
-export const getSets = async (): Promise<VocabSet[]> => {
-    return apiFetch(`${API_URL}/sets`);
+export const getSets = async (page: number, limit: number): Promise<{ sets: VocabSet[], page: number, pages: number, total: number }> => {
+    return apiFetch(`${API_URL}/sets?page=${page}&limit=${limit}`);
+};
+
+export const getSetById = async (setId: string): Promise<VocabSet> => {
+    return apiFetch(`${API_URL}/sets/${setId}`);
 };
 
 export const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }): Promise<VocabSet> => {
@@ -112,7 +119,7 @@ export const getQuizHistory = async (): Promise<QuizHistory[]> => {
     return apiFetch(`${API_URL}/history`);
 };
 
-export const saveQuizResult = async (setId: string, result: QuizResultType): Promise<{ newHistoryItem: QuizHistory, updatedUser: Partial<User>, updatedSet?: VocabSet }> => {
+export const saveQuizResult = async (setId: string, result: QuizResultType): Promise<{ updatedUser: Partial<User>, updatedSet?: VocabSet }> => {
     return apiFetch(`${API_URL}/history`, {
         method: 'POST',
         body: JSON.stringify({ 
@@ -124,9 +131,22 @@ export const saveQuizResult = async (setId: string, result: QuizResultType): Pro
     });
 };
 
+// --- New User Stats Endpoint ---
+export const getUserStats = async (): Promise<UserStats> => {
+    return apiFetch(`${API_URL}/history/stats`);
+};
+
+
 // --- Community Features ---
-export const getPublicSets = async (): Promise<VocabSet[]> => {
-    return apiFetch(`${API_URL}/sets/community`);
+export const getPublicSets = async (page: number, limit: number, searchTerm?: string): Promise<{ sets: VocabSet[]; page: number; pages: number; total: number; }> => {
+    const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+    });
+    if (searchTerm) {
+        params.append('search', searchTerm);
+    }
+    return apiFetch(`${API_URL}/sets/community?${params.toString()}`);
 };
 
 export const getPublicSetDetails = async (setId: string): Promise<VocabSet> => {

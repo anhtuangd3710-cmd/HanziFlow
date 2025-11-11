@@ -1,15 +1,12 @@
+
 import React from 'react';
 import { IconBase } from './IconBase';
 
-// FIX: Update props to accept standard SVG attributes like 'title'.
-// This allows for better accessibility and flexibility, and fixes the type error
-// when passing a title prop in VocabSetCard.tsx.
-type GlobeIconProps = React.ComponentProps<'svg'> & {
-  size?: number;
-};
-
-
-export const GlobeIcon: React.FC<GlobeIconProps> = (props) => (
+// FIX: The component props are now defined inline with an intersection type
+// to ensure all SVG attributes, including 'title', are correctly recognized.
+// This resolves a typing error when using this component in VocabSetCard.
+// FIX: Added 'title' to the component's props to allow it to be passed down.
+export const GlobeIcon: React.FC<React.SVGProps<SVGSVGElement> & { size?: number; title?: string; }> = (props) => (
   <IconBase {...props}>
     <circle cx="12" cy="12" r="10"></circle>
     <line x1="2" y1="12" x2="22" y2="12"></line>

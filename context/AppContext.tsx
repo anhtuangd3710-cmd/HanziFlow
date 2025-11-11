@@ -1,5 +1,6 @@
+
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
-import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem } from '../types';
+import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats } from '../types';
 import * as api from '../services/api';
 import { AuthError } from '../services/api'; // Import the custom error type
 import * as geminiService from '../services/geminiService';
@@ -7,8 +8,11 @@ import * as geminiService from '../services/geminiService';
 const initialState: AppState = {
   user: null,
   vocabSets: [],
+  setsPagination: null,
   publicSets: [],
+  publicSetsPagination: null,
   quizHistory: [],
+  userStats: null,
   isLoading: false,
   isRequestingUserApiKey: false,
 };
@@ -25,11 +29,28 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SETS_LOADED':
-      return { ...state, vocabSets: action.payload };
+      return { 
+          ...state, 
+          vocabSets: action.payload.sets,
+          setsPagination: {
+              currentPage: action.payload.page,
+              totalPages: action.payload.pages,
+              totalSets: action.payload.total,
+              limit: 8 // This should match the backend limit
+          }
+      };
     case 'PUBLIC_SETS_LOADED':
-      return { ...state, publicSets: action.payload, isLoading: false };
-    case 'ADD_SET':
-      return { ...state, vocabSets: [...state.vocabSets, action.payload] };
+      return { 
+        ...state, 
+        publicSets: action.payload.sets,
+        publicSetsPagination: {
+          currentPage: action.payload.page,
+          totalPages: action.payload.pages,
+          totalSets: action.payload.total,
+          limit: 8 // This should match the backend limit
+        },
+        isLoading: false 
+      };
     case 'UPDATE_SET':
       return {
         ...state,
@@ -37,16 +58,10 @@ const appReducer = (state: AppState, action: Action): AppState => {
           set._id === action.payload._id ? action.payload : set
         ),
       };
-    case 'DELETE_SET':
-      return {
-        ...state,
-        vocabSets: state.vocabSets.filter(set => set._id !== action.payload),
-      };
     case 'HISTORY_LOADED':
         return { ...state, quizHistory: action.payload };
-    case 'ADD_HISTORY_ITEM':
-        const updatedHistory = [action.payload, ...state.quizHistory].slice(0, 20);
-        return { ...state, quizHistory: updatedHistory };
+    case 'USER_STATS_LOADED':
+        return { ...state, userStats: action.payload };
     case 'REQUEST_USER_API_KEY':
         return { ...state, isRequestingUserApiKey: action.payload };
     default:
@@ -59,14 +74,14 @@ interface AppContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
     logout: () => void;
-    fetchSets: () => Promise<void>;
+    fetchSets: (page: number) => Promise<void>;
     saveSet: (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => Promise<VocabSet | undefined>;
     deleteSet: (setId: string) => Promise<void>;
     saveQuizResult: (setId: string, result: QuizResultType) => Promise<void>;
     toggleNeedsReview: (setId: string, itemId: string) => Promise<void>;
     generateSetWithAI: (topic: string, count: number) => Promise<VocabItem[] | null>;
     generateExample: (word: { hanzi: string; pinyin: string; meaning: string; }) => Promise<string | null>;
-    fetchPublicSets: () => Promise<void>;
+    fetchPublicSets: (page: number, searchTerm?: string) => Promise<void>;
     cloneSet: (setId: string) => Promise<VocabSet | undefined>;
     closeApiKeyModal: () => void;
 }
@@ -121,17 +136,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         localStorage.removeItem('hanziflow_user');
         dispatch({ type: 'LOGOUT' });
     }, []);
+
+    const fetchSets = useCallback(async (page: number) => {
+        if (!state.user?.token) return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const data = await api.getSets(page, 8);
+            dispatch({ type: 'SETS_LOADED', payload: data });
+        } catch(error) {
+            console.error("Failed to fetch sets:", error);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            }
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    }, [state.user?.token, logout]);
     
     const fetchInitialData = useCallback(async () => {
         if (!state.user?.token) return;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const [sets, history] = await Promise.all([
-                api.getSets(),
-                api.getQuizHistory()
+            // Fetch sets, history, and global stats concurrently
+            const [, history, stats] = await Promise.all([
+                fetchSets(1),
+                api.getQuizHistory(),
+                api.getUserStats()
             ]);
-            dispatch({ type: 'SETS_LOADED', payload: sets });
             dispatch({ type: 'HISTORY_LOADED', payload: history });
+            dispatch({ type: 'USER_STATS_LOADED', payload: stats });
         } catch (error) {
             console.error("Failed to fetch initial data:", error);
             if (error instanceof AuthError) {
@@ -141,7 +175,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user?.token, logout]);
+    }, [state.user?.token, logout, fetchSets]);
 
 
     const saveSet = async (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }): Promise<VocabSet | undefined> => {
@@ -149,11 +183,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const savedSet = await api.saveSet(set);
-            if(set._id) {
+            if(set._id) { // This was an update
                 dispatch({ type: 'UPDATE_SET', payload: savedSet });
-            } else {
-                dispatch({ type: 'ADD_SET', payload: savedSet });
+            } else { // This was a creation, refetch the first page
+                await fetchSets(1);
             }
+            // Refetch stats after saving a set as it can change mastery totals
+            const stats = await api.getUserStats();
+            dispatch({ type: 'USER_STATS_LOADED', payload: stats });
             return savedSet;
         } catch(error) {
             console.error("Failed to save set:", error);
@@ -173,7 +210,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             await api.deleteSet(setId);
-            dispatch({ type: 'DELETE_SET', payload: setId });
+            // After deletion, refetch the current page.
+            // If it was the last item on a page > 1, fetch the previous page.
+            const { vocabSets, setsPagination } = state;
+            let pageToFetch = setsPagination?.currentPage || 1;
+            if (vocabSets.length === 1 && pageToFetch > 1) {
+                pageToFetch -= 1;
+            }
+            await fetchSets(pageToFetch);
+            // Also refetch stats
+            const stats = await api.getUserStats();
+            dispatch({ type: 'USER_STATS_LOADED', payload: stats });
+
         } catch(error) {
             console.error("Failed to delete set:", error);
             if (error instanceof AuthError) {
@@ -182,21 +230,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             } else {
                 alert((error as Error).message);
             }
-        } finally {
-            dispatch({ type: 'SET_LOADING', payload: false });
+            // fetchSets will handle the final loading state
         }
     };
 
     const saveQuizResult = async (setId: string, result: QuizResultType) => {
         if (!state.user) return;
         try {
-            const { newHistoryItem, updatedUser, updatedSet } = await api.saveQuizResult(setId, result);
+            const { updatedUser, updatedSet } = await api.saveQuizResult(setId, result);
             
-            dispatch({ type: 'ADD_HISTORY_ITEM', payload: newHistoryItem });
+            // Refetch history to ensure consistency and prevent duplicates
+            const freshHistory = await api.getQuizHistory();
+            dispatch({ type: 'HISTORY_LOADED', payload: freshHistory });
+
             dispatch({ type: 'UPDATE_USER', payload: updatedUser });
             if (updatedSet) {
               dispatch({ type: 'UPDATE_SET', payload: updatedSet });
             }
+            
+            // Refetch stats after a quiz to show immediate progress
+            const stats = await api.getUserStats();
+            dispatch({ type: 'USER_STATS_LOADED', payload: stats });
+
 
             const storedUser = localStorage.getItem('hanziflow_user');
             if (storedUser) {
@@ -222,7 +277,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         let foundItem: VocabItem | undefined;
         const updatedItems = targetSet.items.map(item => {
             if (item.id === itemId) {
-                foundItem = { ...item, needsReview: !item.needsReview };
+                // Fix: Ensure needsReview is treated as a boolean even if undefined
+                foundItem = { ...item, needsReview: !(item.needsReview || false) };
                 return foundItem;
             }
             return item;
@@ -280,11 +336,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    const fetchPublicSets = async () => {
+    const fetchPublicSets = useCallback(async (page: number, searchTerm = '') => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const publicSets = await api.getPublicSets();
-            dispatch({ type: 'PUBLIC_SETS_LOADED', payload: publicSets });
+            const data = await api.getPublicSets(page, 9, searchTerm); // 9 per page for a 3-column layout
+            dispatch({ type: 'PUBLIC_SETS_LOADED', payload: data });
         } catch (error) {
             console.error("Failed to fetch public sets:", error);
             if (error instanceof AuthError) {
@@ -295,14 +351,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    };
+    }, [logout]);
+
 
     const cloneSet = async (setId: string): Promise<VocabSet | undefined> => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const { newSet, updatedUser } = await api.cloneSet(setId);
-            dispatch({ type: 'ADD_SET', payload: newSet });
+            await fetchSets(1); // Refetch user's sets to show the new one
             dispatch({ type: 'UPDATE_USER', payload: updatedUser });
+            
+            // Also refetch stats
+            const stats = await api.getUserStats();
+            dispatch({ type: 'USER_STATS_LOADED', payload: stats });
+
 
             const storedUser = localStorage.getItem('hanziflow_user');
             if (storedUser) {
@@ -330,11 +392,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (state.user) {
             fetchInitialData();
         }
-    }, [fetchInitialData, state.user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.user?.token]);
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, fetchSets: fetchInitialData, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal }}>
+    <AppContext.Provider value={{ state, login, register, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal }}>
       {children}
     </AppContext.Provider>
   );

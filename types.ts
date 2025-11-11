@@ -62,7 +62,7 @@ export type QuestionType =
 export interface QuizQuestion {
   type: QuestionType;
   vocabItem: VocabItem;
-  options: string[]; // array of meanings or hanzi for multiple choice
+  options?: string[]; // array of meanings or hanzi for multiple choice
   correctAnswer: string; // the correct meaning, pinyin, or hanzi
   userAnswer?: string;
 }
@@ -73,11 +73,45 @@ export interface QuizResultType {
     questions: QuizQuestion[];
 }
 
+// --- New User Stats Type ---
+export interface UserStats {
+    mastery: {
+        new: number;
+        learning: number;
+        known: number;
+        mastered: number;
+        total: number;
+    };
+    reviewForecast: {
+        date: string; // "YYYY-MM-DD"
+        count: number;
+    }[]; // 7 days
+    setsForReview: {
+        setId: string;
+        setTitle: string;
+        dueCount: number;
+    }[];
+}
+
+
 export interface AppState {
   user: User | null;
   vocabSets: VocabSet[];
-  publicSets: VocabSet[]; // For community page
+  setsPagination: {
+    currentPage: number;
+    totalPages: number;
+    totalSets: number;
+    limit: number;
+  } | null;
+  publicSets: VocabSet[];
+  publicSetsPagination: {
+    currentPage: number;
+    totalPages: number;
+    totalSets: number;
+    limit: number;
+  } | null;
   quizHistory: QuizHistory[];
+  userStats: UserStats | null;
   isLoading: boolean;
   isRequestingUserApiKey: boolean; // To show the API key modal
 }
@@ -87,11 +121,9 @@ export type Action =
   | { type: 'LOGOUT' }
   | { type: 'UPDATE_USER'; payload: Partial<User> }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SETS_LOADED'; payload: VocabSet[] }
-  | { type: 'ADD_SET'; payload: VocabSet }
+  | { type: 'SETS_LOADED'; payload: { sets: VocabSet[]; page: number; pages: number; total: number; } }
   | { type: 'UPDATE_SET'; payload: VocabSet }
-  | { type: 'DELETE_SET'; payload: string } // by setId (_id)
   | { type: 'HISTORY_LOADED'; payload: QuizHistory[] }
-  | { type: 'ADD_HISTORY_ITEM'; payload: QuizHistory }
-  | { type: 'PUBLIC_SETS_LOADED'; payload: VocabSet[] }
+  | { type: 'PUBLIC_SETS_LOADED'; payload: { sets: VocabSet[]; page: number; pages: number; total: number; } }
+  | { type: 'USER_STATS_LOADED'; payload: UserStats }
   | { type: 'REQUEST_USER_API_KEY'; payload: boolean }; // Action for the modal

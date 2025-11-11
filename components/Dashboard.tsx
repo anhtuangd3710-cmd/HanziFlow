@@ -12,6 +12,8 @@ import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
 import AiSetGeneratorModal from './AiSetGeneratorModal';
 import ProgressCard from './ProgressCard';
 import ReviewSessionModal from './ReviewSessionModal';
+import Pagination from './Pagination';
+import SessionSetupModal from './SessionSetupModal';
 
 const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -33,12 +35,13 @@ const Dashboard: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [setsForReview, setSetsForReview] = useState<{ setId: string; setTitle: string; dueCount: number }[]>([]);
+  const [isSessionSetupOpen, setIsSessionSetupOpen] = useState(false);
+  const [activeSet, setActiveSet] = useState<VocabSet | null>(null);
   const [editingSet, setEditingSet] = useState<VocabSet | null>(null);
   const navigate = useNavigate();
   
   if (!context) return <Spinner />;
-  const { state, deleteSet } = context;
+  const { state, deleteSet, fetchSets } = context;
 
 
   const handleAddNewSet = () => {
@@ -62,13 +65,10 @@ const Dashboard: React.FC = () => {
     }
   }, [deleteSet]);
 
-  const handleStudy = useCallback((setId: string) => {
-    navigate(`/set/${setId}/study`);
-  }, [navigate]);
-  
-  const handleQuiz = useCallback((setId: string, questionTypes?: QuestionType[]) => {
-    navigate(`/set/${setId}/quiz`, { state: { quizType: 'standard', questionTypes } });
-  }, [navigate]);
+  const handleOpenSessionSetup = useCallback((set: VocabSet) => {
+    setActiveSet(set);
+    setIsSessionSetupOpen(true);
+  }, []);
 
   const handleReviewQuiz = useCallback((setId: string) => {
     navigate(`/set/${setId}/quiz`, { state: { quizType: 'review' } });
@@ -78,15 +78,22 @@ const Dashboard: React.FC = () => {
     navigate(`/set/${setId}/progress`);
   }, [navigate]);
   
-  const handleOpenReviewModal = useCallback((setsForReview: { setId: string; setTitle: string; dueCount: number }[]) => {
-      setSetsForReview(setsForReview);
-      setIsReviewModalOpen(true);
-  }, []);
+  const handleOpenReviewModal = useCallback(() => {
+      if (state.userStats && state.userStats.setsForReview.length > 0) {
+        setIsReviewModalOpen(true);
+      }
+  }, [state.userStats]);
+  
+  const handlePageChange = (page: number) => {
+    fetchSets(page);
+  };
 
   const user = state.user;
-  const userSets = state.vocabSets; 
+  const userSets = state.vocabSets;
+  const pagination = state.setsPagination;
+  const userStats = state.userStats;
 
-  if (state.isLoading && userSets.length === 0 && state.quizHistory.length === 0) {
+  if (state.isLoading && !userStats) {
       return (
         <div className="flex justify-center items-center h-64">
             <Spinner />
@@ -119,37 +126,48 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {userSets.length === 0 ? (
+        {pagination && pagination.totalSets === 0 ? (
           <div className="text-center py-16 px-6 bg-white rounded-lg shadow-md border-2 border-dashed border-gray-300">
             <EmptySetIcon className="mx-auto h-16 w-16 text-gray-400" />
             <h3 className="mt-4 text-xl font-semibold text-gray-800">Create Your First Vocabulary Set</h3>
             <p className="mt-2 text-gray-500">Your learning journey begins here. Click "New Set" to add words manually, or "Generate with AI" to get started instantly.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {userSets.map(set => (
-              <VocabSetCard 
-                key={set._id}
-                set={set}
-                onStudy={handleStudy}
-                onQuiz={handleQuiz}
-                onReviewQuiz={handleReviewQuiz}
-                onProgress={handleProgress}
-                onEdit={handleEditSet}
-                onDelete={handleDeleteSet}
-              />
-            ))}
-          </div>
+          <>
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-opacity duration-300 ${state.isLoading && userSets.length > 0 ? 'opacity-50' : 'opacity-100'}`}>
+              {userSets.map(set => (
+                <VocabSetCard 
+                  key={set._id}
+                  set={set}
+                  onStartSession={handleOpenSessionSetup}
+                  onReviewQuiz={handleReviewQuiz}
+                  onProgress={handleProgress}
+                  onEdit={handleEditSet}
+                  onDelete={handleDeleteSet}
+                />
+              ))}
+            </div>
+            {pagination && pagination.totalPages > 1 && (
+              <div className="mt-8 flex justify-center">
+                <Pagination
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  isDisabled={state.isLoading}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
       
       {/* Sidebar: Gamification & History */}
       <div className="lg:col-span-1">
         <div className="sticky top-24 space-y-8">
-           {user && (
+           {user && userStats && (
               <ProgressCard 
                 user={user}
-                vocabSets={state.vocabSets}
+                userStats={userStats}
                 onStartReview={handleOpenReviewModal}
               />
            )}
@@ -160,8 +178,8 @@ const Dashboard: React.FC = () => {
               {state.quizHistory.length === 0 ? (
                   <p className="text-gray-500 text-sm">You haven't completed any quizzes yet. Take a quiz to see your history here!</p>
               ) : (
-                  <ul className="space-y-4 max-h-[40vh] overflow-y-auto">
-                      {state.quizHistory.map(history => {
+                  <ul className="space-y-4">
+                      {state.quizHistory.slice(0, 3).map(history => {
                           const percentage = history.total > 0 ? Math.round((history.score / history.total) * 100) : 0;
                           return (
                               <li key={history._id} className="p-3 bg-gray-50 rounded-md border border-gray-200">
@@ -194,13 +212,19 @@ const Dashboard: React.FC = () => {
           }}
         />
       )}
-      {isReviewModalOpen && (
+      {isReviewModalOpen && userStats && (
         <ReviewSessionModal
             isOpen={isReviewModalOpen}
             onClose={() => setIsReviewModalOpen(false)}
-            setsForReview={setsForReview}
+            setsForReview={userStats.setsForReview}
             onStartSetReview={handleReviewQuiz}
         />
+      )}
+      {isSessionSetupOpen && activeSet && (
+          <SessionSetupModal
+            set={activeSet}
+            onClose={() => setIsSessionSetupOpen(false)}
+          />
       )}
     </div>
   );

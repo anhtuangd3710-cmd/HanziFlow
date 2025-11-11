@@ -1,83 +1,176 @@
 
-import React, { useState, useContext, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AppContext } from '../context/AppContext';
-import { VocabItem } from '../types';
+import { VocabItem, VocabSet } from '../types';
 import { speakText } from '../services/geminiService';
+import { getSetById } from '../services/api';
 import { Volume2Icon } from './icons/Volume2Icon';
 import { StarIcon } from './icons/StarIcon';
-import { ShuffleIcon } from './icons/ShuffleIcon';
+import Spinner from './Spinner';
+import { CheckCircleIcon } from './icons/CheckCircleIcon';
+import { XCircleIcon } from './icons/XCircleIcon';
+
+interface LocationState {
+    studyMode: 'all' | 'review';
+}
 
 const FlashcardView: React.FC = () => {
   const { setId } = useParams<{ setId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const context = useContext(AppContext);
-
-  if (!context) return <div>Loading...</div>;
-  const { state, toggleNeedsReview } = context;
-
-  const set = useMemo(() => state.vocabSets.find(s => s._id === setId), [state.vocabSets, setId]);
   
+  const { studyMode } = (location.state as LocationState) || { studyMode: 'all' };
+
+  const [studySet, setStudySet] = useState<VocabSet | null | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [shuffledItems, setShuffledItems] = useState<VocabItem[]>([]);
+  const [sessionItems, setSessionItems] = useState<VocabItem[]>([]);
+  
+  if (!context) return <div>Loading...</div>;
+  const { state, saveSet } = context;
 
-  React.useEffect(() => {
-    if (set && shuffledItems.length === 0) { // Only shuffle once at the beginning
-      setShuffledItems([...set.items].sort(() => Math.random() - 0.5));
-    } else if (set) {
-      // If the set items have changed (e.g., from a review toggle), update the item in our shuffled list
-      // without changing the order, preserving the study flow.
-      setShuffledItems(currentShuffled => {
-        return currentShuffled.map(shuffledItem => {
-          const updatedItem = set.items.find(item => item.id === shuffledItem.id);
-          return updatedItem || shuffledItem;
-        });
-      });
+  const setFromContext = useMemo(() => state.vocabSets.find(s => s._id === setId), [state.vocabSets, setId]);
+
+  useEffect(() => {
+    if (setFromContext) {
+      setStudySet(setFromContext);
+      setIsLoading(false);
+      return;
     }
-  }, [set]);
 
-  const goNext = () => {
+    const fetchStudySet = async () => {
+      if (!setId) { setStudySet(null); setIsLoading(false); return; }
+      setIsLoading(true);
+      try {
+        const fetchedSet = await getSetById(setId);
+        setStudySet(fetchedSet);
+      } catch (error) {
+        console.error("Failed to fetch study set:", error);
+        setStudySet(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStudySet();
+  }, [setId, setFromContext]);
+
+
+  useEffect(() => {
+    if (studySet) {
+        let items = studyMode === 'review' 
+            ? studySet.items.filter(item => item.needsReview)
+            : studySet.items;
+      
+        setSessionItems([...items].sort(() => Math.random() - 0.5));
+        setCurrentIndex(0);
+        setIsFlipped(false);
+    }
+  }, [studySet, studyMode]);
+
+  const updateReviewStatus = useCallback(async (item: VocabItem, needsReview: boolean) => {
+    if (!studySet || item.needsReview === needsReview) return;
+    
+    setIsSaving(true);
+    const updatedItems = studySet.items.map(i =>
+      i.id === item.id ? { ...i, needsReview } : i
+    );
+    const updatedSet = { ...studySet, items: updatedItems };
+    
+    // Optimistic update for UI
+    setStudySet(updatedSet);
+    
+    await saveSet(updatedSet);
+    setIsSaving(false);
+  }, [studySet, saveSet]);
+
+
+  const handleAssessment = (correct: boolean) => {
+    if (!currentItem) return;
+    updateReviewStatus(currentItem, !correct);
     setIsFlipped(false);
     setTimeout(() => {
-        setCurrentIndex((prevIndex) => (prevIndex + 1) % shuffledItems.length);
-    }, 150); // wait for flip animation
-  };
-  
-  const handleShuffle = () => {
-    if (set) {
-        setIsFlipped(false);
-        // Timeout allows the card to flip back before the content changes
-        setTimeout(() => {
-            setShuffledItems([...set.items].sort(() => Math.random() - 0.5));
-            setCurrentIndex(0);
-        }, 150);
-    }
+        setCurrentIndex((prevIndex) => prevIndex + 1);
+    }, 150);
   };
 
   const handleSpeak = (e: React.MouseEvent, text: string) => {
-    e.stopPropagation(); // Prevent card from flipping when clicking the button
+    e.stopPropagation();
     speakText(text);
   };
 
-  const handleToggleReview = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (currentItem && setId) {
-      toggleNeedsReview(setId, currentItem.id);
-    }
-  };
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (sessionItems.length === 0 || currentIndex >= sessionItems.length) return;
 
-  const currentItem = shuffledItems[currentIndex];
+        if (e.code === 'Space') {
+            e.preventDefault();
+            setIsFlipped(f => !f);
+        }
+        if (isFlipped) {
+            if (e.code === 'ArrowLeft') handleAssessment(false); // Wrong
+            if (e.code === 'ArrowRight') handleAssessment(true); // Right
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFlipped, sessionItems, currentIndex]);
 
-  if (!set) return <div>Set not found. <button onClick={() => navigate('/')}>Go back.</button></div>;
-  if (shuffledItems.length === 0) return <div>This set has no words. <button onClick={() => navigate('/')} className="text-blue-500 underline">Go back.</button></div>;
+  const currentItem = sessionItems[currentIndex];
+
+  if (isLoading) return <div className="flex justify-center mt-8"><Spinner /></div>;
+  if (!studySet) return <div>Set not found. <button onClick={() => navigate('/')}>Go back.</button></div>;
+  if (sessionItems.length === 0) {
+      return (
+        <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
+            <h3 className="text-xl font-semibold text-gray-700">No Words to Study</h3>
+            <p className="text-gray-500 mt-2">
+                {studyMode === 'review' 
+                    ? "You have no words marked for review in this set."
+                    : "This set is currently empty."
+                }
+            </p>
+            <button onClick={() => navigate('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Back to Dashboard
+            </button>
+        </div>
+      );
+  }
+
+  if (currentIndex >= sessionItems.length) {
+      return (
+        <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
+            <h3 className="text-2xl font-bold text-green-600">Session Complete!</h3>
+            <p className="text-gray-600 mt-2">You've reviewed all the words for this session.</p>
+            <div className="flex justify-center gap-4 mt-6">
+                <button onClick={() => navigate('/')} className="py-2 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
+                    Finish
+                </button>
+                <button onClick={() => { setCurrentIndex(0); setSessionItems([...sessionItems].sort(() => Math.random() - 0.5)) }} className="py-2 px-6 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
+                    Study Again
+                </button>
+            </div>
+        </div>
+      )
+  }
+
+  const progressPercentage = (currentIndex / sessionItems.length) * 100;
   
-
   return (
     <div className="max-w-2xl mx-auto flex flex-col items-center">
-      <div className="w-full flex justify-between items-baseline mb-4">
-        <h2 className="text-2xl font-bold text-gray-700">{set.title}</h2>
-        <p className="text-lg text-gray-500">Card {currentIndex + 1} of {shuffledItems.length}</p>
+      <div className="w-full mb-4">
+        <div className="flex justify-between items-baseline mb-2">
+            <h2 className="text-2xl font-bold text-gray-700">{studySet.title}</h2>
+            <p className="text-lg text-gray-500">{currentIndex + 1} / {sessionItems.length}</p>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{width: `${progressPercentage}%`}}></div>
+        </div>
       </div>
       
       <div className="w-full h-80 perspective-1000">
@@ -94,19 +187,20 @@ const FlashcardView: React.FC = () => {
             >
                 <Volume2Icon size={28} />
             </button>
-            <p className="text-6xl font-semibold">{currentItem.hanzi}</p>
-            <p className="text-2xl text-gray-500 mt-4">{currentItem.pinyin}</p>
-          </div>
-          {/* Back of card */}
-          <div className="absolute w-full h-full backface-hidden bg-blue-500 text-white rounded-lg shadow-xl flex flex-col items-center justify-center p-6 cursor-pointer rotate-y-180">
+             {isSaving && <div className="absolute top-4 left-4"><Spinner /></div>}
             <button
-                onClick={handleToggleReview}
-                className={`absolute top-4 right-4 p-2 rounded-full transition-colors ${currentItem?.needsReview ? 'text-yellow-400 hover:text-yellow-300' : 'text-white/70 hover:text-white'}`}
+                onClick={(e) => { e.stopPropagation(); updateReviewStatus(currentItem, !currentItem.needsReview); }}
+                className={`absolute bottom-4 right-4 p-2 rounded-full transition-colors ${currentItem?.needsReview ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-600'}`}
                 aria-label="Mark for review"
                 title={currentItem?.needsReview ? "Unmark from review" : "Mark for review"}
             >
                 <StarIcon size={28} filled={!!currentItem?.needsReview} />
             </button>
+            <p className="text-6xl font-semibold">{currentItem.hanzi}</p>
+            <p className="text-2xl text-gray-500 mt-4">{currentItem.pinyin}</p>
+          </div>
+          {/* Back of card */}
+          <div className="absolute w-full h-full backface-hidden bg-blue-500 text-white rounded-lg shadow-xl flex flex-col items-center justify-center p-6 cursor-pointer rotate-y-180">
             <div className="text-center">
                 <p className="text-4xl font-bold">{currentItem.meaning}</p>
                 {currentItem.exampleSentence && (
@@ -117,16 +211,25 @@ const FlashcardView: React.FC = () => {
         </div>
       </div>
       
-      <div className="mt-8 flex w-full justify-center gap-4">
-        <button onClick={handleShuffle} className="w-48 flex items-center justify-center py-3 px-6 bg-gray-500 text-white font-bold rounded-lg shadow-md hover:bg-gray-600 transition-colors">
-            <ShuffleIcon size={20} className="mr-2" />
-            Shuffle
-        </button>
-        <button onClick={goNext} className="w-48 py-3 px-6 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-            Next Card
-        </button>
-      </div>
-
+      {isFlipped ? (
+         <div className="mt-8 flex w-full justify-center gap-4">
+             <button onClick={() => handleAssessment(false)} className="w-48 flex items-center justify-center gap-2 py-3 px-6 bg-red-500 text-white font-bold rounded-lg shadow-md hover:bg-red-600 transition-colors">
+                 <XCircleIcon size={20} />
+                 Need to Review
+             </button>
+             <button onClick={() => handleAssessment(true)} className="w-48 flex items-center justify-center gap-2 py-3 px-6 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition-colors">
+                 <CheckCircleIcon size={20} />
+                 Got It Right
+             </button>
+         </div>
+      ) : (
+        <div className="mt-8 flex w-full justify-center">
+            <button onClick={() => setIsFlipped(true)} className="w-full max-w-xs py-3 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
+                Show Answer
+            </button>
+        </div>
+      )}
+      
        <button onClick={() => navigate('/')} className="mt-8 text-gray-600 hover:text-gray-800 font-semibold">
            ← Back to Dashboard
        </button>

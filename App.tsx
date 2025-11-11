@@ -11,6 +11,7 @@ import ApiKeyModal from './components/ApiKeyModal'; // Import the modal
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const FlashcardView = lazy(() => import('./components/FlashcardView'));
 const QuizView = lazy(() => import('./components/QuizView'));
+const LightningQuizView = lazy(() => import('./components/LightningQuizView'));
 const QuizResult = lazy(() => import('./components/QuizResult'));
 const ProgressView = lazy(() => import('./components/ProgressView'));
 const CommunityView = lazy(() => import('./components/CommunityView'));
@@ -57,6 +58,7 @@ const App: React.FC = () => {
           <Route index element={<Dashboard />} />
           <Route path="set/:setId/study" element={<FlashcardView />} />
           <Route path="set/:setId/quiz" element={<QuizView />} />
+          <Route path="set/:setId/lightning-quiz" element={<LightningQuizView />} />
           <Route path="set/:setId/result" element={<QuizResult />} />
           <Route path="set/:setId/progress" element={<ProgressView />} />
           <Route path="community" element={<CommunityView />} />
