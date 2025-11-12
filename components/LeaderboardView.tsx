@@ -16,15 +16,21 @@ const formatJoinDate = (dateString?: string) => {
 const LeaderboardView: React.FC = () => {
     const context = useContext(AppContext);
 
+    // Destructure for stable dependencies to prevent re-renders
+    const fetchLeaderboard = context?.fetchLeaderboard;
+    const leaderboard = context?.state.leaderboard;
+
     useEffect(() => {
-        if (context && !context.state.leaderboard) {
-            context.fetchLeaderboard();
+        // This effect will now only run when fetchLeaderboard or the leaderboard data itself changes,
+        // preventing the infinite loop caused by depending on the entire context object.
+        if (fetchLeaderboard && !leaderboard) {
+            fetchLeaderboard();
         }
-    }, [context]);
+    }, [fetchLeaderboard, leaderboard]);
 
     if (!context) return <Spinner />;
     const { state } = context;
-    const { leaderboard, isLoading, user: currentUser } = state;
+    const { isLoading, user: currentUser } = state;
 
     if (isLoading && !leaderboard) {
         return (

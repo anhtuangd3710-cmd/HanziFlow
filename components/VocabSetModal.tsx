@@ -195,10 +195,6 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
             blankrows: false,
             raw: false
         });
-        
-        console.log('Raw imported data:', jsonData);
-        console.log('Total rows:', jsonData.length);
-        console.log('First 3 rows:', jsonData.slice(0, 3));
 
         if (jsonData.length < 1) {
             showToast("Error: The file appears to be empty.");
@@ -206,86 +202,79 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
         }
         
         const firstRow = jsonData[0];
-        const firstRowStr = firstRow.map(cell => cell ? String(cell).toLowerCase().trim() : '');
         
         let hanziIndex = -1;
         let pinyinIndex = -1;
         let meaningIndex = -1;
         let exampleIndex = -1;
-        let hasHeader = false;
 
-        // Check if first row looks like a header
+        // Define keywords for each column, including some common Chinese headers
+        const hanziKeywords = ['hanzi', 'chinese', 'word', 'character', '词', '汉字'];
+        const pinyinKeywords = ['pinyin', 'pronunciation', '拼音'];
+        const meaningKeywords = ['meaning', 'translation', 'definition', '意思', '翻译'];
+        const exampleKeywords = ['example', 'sentence', '例子', '例句'];
+
+        const firstRowStr = firstRow.map(cell => cell ? String(cell).toLowerCase().trim() : '');
+        
+        // Map header text to column index
         firstRowStr.forEach((cell, index) => {
-            const normalized = cell.replace(/[\s\uFEFF\xA0_-]+/g, '').replace(/[^a-z]/g, '');
-            
-            if (normalized.includes('hanzi') || normalized.includes('chinese') || normalized.includes('word')) {
-                hasHeader = true;
-                if (hanziIndex === -1) hanziIndex = index;
-            } else if (normalized.includes('pinyin') || normalized.includes('pronunciation')) {
-                hasHeader = true;
-                if (pinyinIndex === -1) pinyinIndex = index;
-            } else if (normalized.includes('meaning') || normalized.includes('translation') || normalized.includes('definition')) {
-                hasHeader = true;
-                if (meaningIndex === -1) meaningIndex = index;
-            } else if (normalized.includes('example') || normalized.includes('sentence')) {
-                hasHeader = true;
-                if (exampleIndex === -1) exampleIndex = index;
+            const normalized = cell.replace(/[\s\uFEFF\xA0_-]+/g, '');
+            if (hanziKeywords.some(kw => normalized.includes(kw)) && hanziIndex === -1) {
+                hanziIndex = index;
+            }
+            if (pinyinKeywords.some(kw => normalized.includes(kw)) && pinyinIndex === -1) {
+                pinyinIndex = index;
+            }
+            if (meaningKeywords.some(kw => normalized.includes(kw)) && meaningIndex === -1) {
+                meaningIndex = index;
+            }
+            if (exampleKeywords.some(kw => normalized.includes(kw)) && exampleIndex === -1) {
+                exampleIndex = index;
             }
         });
+        
+        const hasHeader = [hanziIndex, pinyinIndex, meaningIndex].every(i => i > -1);
+        let dataRows = jsonData;
 
-        // If no header detected, use positional matching
-        if (!hasHeader) {
+        if (hasHeader) {
+            console.log(`Header detected. Mapping - Hanzi: ${hanziIndex}, Pinyin: ${pinyinIndex}, Meaning: ${meaningIndex}, Example: ${exampleIndex}`);
+            dataRows = jsonData.slice(1);
+        } else {
             console.log('No header detected, using positional matching (A=hanzi, B=pinyin, C=meaning, D=example)');
             hanziIndex = 0;
             pinyinIndex = 1;
             meaningIndex = 2;
-            if (firstRow.length >= 4) exampleIndex = 3;
-        }
-
-        if (hanziIndex === -1 || pinyinIndex === -1 || meaningIndex === -1) {
-            throw new Error(`Import failed: Could not detect columns. Please ensure data is in order: hanzi, pinyin, meaning, example. First row: [${firstRow.join(', ')}]`);
-        }
-        
-        console.log(`Column mapping - Hanzi: ${hanziIndex}, Pinyin: ${pinyinIndex}, Meaning: ${meaningIndex}, Example: ${exampleIndex}, Has Header: ${hasHeader}`);
-        
-        // Skip first row only if it's a header
-        const dataRows = hasHeader ? jsonData.slice(1) : jsonData;
-
-        const newItems: VocabItem[] = dataRows.map((row, index) => {
-            console.log(`Processing row ${index + 1}:`, row);
+            exampleIndex = firstRow.length >= 4 ? 3 : -1;
             
-            // Safely get values with fallback
-            const hanziRaw = row[hanziIndex];
-            const pinyinRaw = row[pinyinIndex];
-            const meaningRaw = row[meaningIndex];
-            const exampleRaw = exampleIndex > -1 ? row[exampleIndex] : '';
+            // Check if the first row looks like data, not an empty header. If it's mostly empty, assume it's a header and skip it.
+            if (!firstRow[hanziIndex] && !firstRow[pinyinIndex] && !firstRow[meaningIndex]) {
+                dataRows = jsonData.slice(1);
+            }
+        }
 
-            const hanzi = hanziRaw != null ? String(hanziRaw).trim() : '';
-            const pinyin = pinyinRaw != null ? String(pinyinRaw).trim() : '';
-            const meaning = meaningRaw != null ? String(meaningRaw).trim() : '';
-            const example = exampleRaw != null ? String(exampleRaw).trim() : '';
+        // Validation after mapping
+        if (hanziIndex === -1 || pinyinIndex === -1 || meaningIndex === -1) {
+            throw new Error(`Import failed: Could not automatically detect required columns (hanzi, pinyin, meaning). Please check your file's header row or ensure data is in the correct order.`);
+        }
+        
+        const newItems: VocabItem[] = dataRows.map((row, index) => {
+            const hanzi = row[hanziIndex] != null ? String(row[hanziIndex]).trim() : '';
+            const pinyin = row[pinyinIndex] != null ? String(row[pinyinIndex]).trim() : '';
+            const meaning = row[meaningIndex] != null ? String(row[meaningIndex]).trim() : '';
+            const example = exampleIndex > -1 && row[exampleIndex] != null ? String(row[exampleIndex]).trim() : '';
 
-            console.log(`  -> hanzi: "${hanzi}", pinyin: "${pinyin}", meaning: "${meaning}", example: "${example.substring(0, 30)}..."`);
-
-            // Skip only if ALL three main fields are empty
             if (!hanzi && !pinyin && !meaning) {
-                console.warn(`Skipping completely empty row ${index + 1}`);
                 return null;
             }
 
-            // Accept row even if only 1 or 2 fields have data
             const vocabItem: VocabItem = {
-                id: `item-import-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-                hanzi: hanzi,
-                pinyin: pinyin,
-                meaning: meaning,
+                id: `item-import-${Date.now()}-${index}`,
+                hanzi, pinyin, meaning,
             };
 
             if (example) {
                 vocabItem.exampleSentence = example;
             }
-
-            console.log(`  ✓ Created item:`, vocabItem);
             return vocabItem;
         }).filter((item): item is VocabItem => item !== null);
 
@@ -296,7 +285,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
             showToast("No valid new items were found in the file.");
         }
     } catch (error: any) {
-        console.error("Excel Parsing Error:", error);
+        console.error("File Import Error:", error);
         showToast(`Import Error: ${error.message}`);
     } finally {
         if (target) {
@@ -395,7 +384,7 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
                       ref={fileInputRef}
                       onChange={handleFileImport}
                       className="hidden"
-                      accept=".xlsx, .xls"
+                      accept=".xlsx, .xls, .csv"
                   />
                   <button onClick={handleDownloadTemplate} className="flex items-center text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-3 rounded-md">
                       <FileTextIcon size={16} className="mr-1.5" /> Template
