@@ -3,7 +3,8 @@ export interface User {
   _id: string;
   email: string;
   name: string;
-  createdAt?: string; 
+  token?: string; // Token is received on login
+  createdAt?: string; // Added from backend timestamps
   // --- Gamification Fields ---
   xp: number;
   currentStreak: number;
@@ -104,7 +105,6 @@ export interface LeaderboardUser {
 
 export interface AppState {
   user: User | null;
-  isAuthLoading: boolean; // For initial session check
   vocabSets: VocabSet[];
   setsPagination: {
     currentPage: number;
@@ -130,7 +130,6 @@ export interface AppState {
 export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
-  | { type: 'AUTH_LOADING'; payload: boolean }
   | { type: 'UPDATE_USER'; payload: Partial<User> }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SETS_LOADED'; payload: { sets: VocabSet[]; page: number; pages: number; total: number; } }

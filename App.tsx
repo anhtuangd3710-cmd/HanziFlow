@@ -1,11 +1,11 @@
 
-import React, { useContext, Suspense, lazy, useEffect } from 'react';
+import React, { useContext, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AppContext } from './context/AppContext';
 import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
 import Spinner from './components/Spinner';
-import ApiKeyModal from './components/ApiKeyModal'; 
+import ApiKeyModal from './components/ApiKeyModal'; // Import the modal
 
 // --- Lazy Load Views ---
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -39,11 +39,6 @@ const ProtectedLayout: React.FC = () => (
 const App: React.FC = () => {
   const context = useContext(AppContext);
 
-  useEffect(() => {
-    // On app start, try to verify the user's session
-    context?.verifyAuth();
-  }, [context]);
-
   if (!context) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -53,17 +48,6 @@ const App: React.FC = () => {
   }
 
   const { state, closeApiKeyModal } = context;
-
-  if (state.isAuthLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <h1 className="text-3xl font-bold text-blue-600 mb-4">HanziFlow</h1>
-        <Spinner />
-        <p className="mt-2 text-gray-500">Securing your session...</p>
-      </div>
-    );
-  }
-
 
   return (
     <>
