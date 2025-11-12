@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { AppContext } from '../context/AppContext';
@@ -175,77 +174,134 @@ const VocabSetModal: React.FC<Props> = ({ set, onClose }) => {
     fileInputRef.current?.click();
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    const target = event.target; // Persist target to reset it later
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    try {
+        const data = new Uint8Array(await file.arrayBuffer());
+        const workbook = XLSX.read(data, { 
+            type: 'array',
+            cellText: false,
+            cellDates: false,
+            raw: true
+        });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { 
+            header: 1,
+            defval: '',
+            blankrows: false,
+            raw: false
+        });
+        
+        console.log('Raw imported data:', jsonData);
+        console.log('Total rows:', jsonData.length);
+        console.log('First 3 rows:', jsonData.slice(0, 3));
 
-            if (jsonData.length < 2) {
-                showToast("Error: The file appears to be empty or has no data rows.");
-                return;
-            }
-
-            const headers = jsonData[0].map(h => String(h).toLowerCase().trim());
-            const hanziIndex = headers.indexOf('hanzi');
-            const pinyinIndex = headers.indexOf('pinyin');
-            const meaningIndex = headers.indexOf('meaning');
-            const exampleIndex = headers.indexOf('examplesentence');
-
-            if (hanziIndex === -1 || pinyinIndex === -1 || meaningIndex === -1) {
-                throw new Error('Import failed: File must contain "Hanzi", "pinyin", and "meaning" columns.');
-            }
-            
-            const dataRows = jsonData.slice(1);
-
-            const newItems: VocabItem[] = dataRows.map((row, index) => {
-                const hanzi = row[hanziIndex];
-                const pinyin = row[pinyinIndex];
-                const meaning = row[meaningIndex];
-
-                if (!hanzi || !pinyin || !meaning) {
-                    console.warn(`Skipping empty or incomplete row ${index + 2}`);
-                    return null;
-                }
-
-                const vocabItem: VocabItem = {
-                    id: `item-import-${Date.now()}-${index}`,
-                    hanzi: String(hanzi),
-                    pinyin: String(pinyin),
-                    meaning: String(meaning),
-                };
-
-                if (exampleIndex > -1 && row[exampleIndex]) {
-                    vocabItem.exampleSentence = String(row[exampleIndex]);
-                }
-
-                return vocabItem;
-            }).filter((item): item is VocabItem => item !== null);
-
-            if (newItems.length > 0) {
-                setItems(prevItems => [...prevItems, ...newItems]);
-                showToast(`Successfully imported ${newItems.length} items.`);
-            } else {
-                showToast("No valid new items were found in the file.");
-            }
-        } catch (error: any) {
-            console.error("Excel Parsing Error:", error);
-            showToast(`${error.message}`);
+        if (jsonData.length < 1) {
+            showToast("Error: The file appears to be empty.");
+            return;
         }
-    };
-    reader.onerror = () => {
-        showToast("Error: Failed to read the file.");
-    };
-    reader.readAsArrayBuffer(file);
-    if (event.target) {
-      event.target.value = '';
+        
+        const firstRow = jsonData[0];
+        const firstRowStr = firstRow.map(cell => cell ? String(cell).toLowerCase().trim() : '');
+        
+        let hanziIndex = -1;
+        let pinyinIndex = -1;
+        let meaningIndex = -1;
+        let exampleIndex = -1;
+        let hasHeader = false;
+
+        // Check if first row looks like a header
+        firstRowStr.forEach((cell, index) => {
+            const normalized = cell.replace(/[\s\uFEFF\xA0_-]+/g, '').replace(/[^a-z]/g, '');
+            
+            if (normalized.includes('hanzi') || normalized.includes('chinese') || normalized.includes('word')) {
+                hasHeader = true;
+                if (hanziIndex === -1) hanziIndex = index;
+            } else if (normalized.includes('pinyin') || normalized.includes('pronunciation')) {
+                hasHeader = true;
+                if (pinyinIndex === -1) pinyinIndex = index;
+            } else if (normalized.includes('meaning') || normalized.includes('translation') || normalized.includes('definition')) {
+                hasHeader = true;
+                if (meaningIndex === -1) meaningIndex = index;
+            } else if (normalized.includes('example') || normalized.includes('sentence')) {
+                hasHeader = true;
+                if (exampleIndex === -1) exampleIndex = index;
+            }
+        });
+
+        // If no header detected, use positional matching
+        if (!hasHeader) {
+            console.log('No header detected, using positional matching (A=hanzi, B=pinyin, C=meaning, D=example)');
+            hanziIndex = 0;
+            pinyinIndex = 1;
+            meaningIndex = 2;
+            if (firstRow.length >= 4) exampleIndex = 3;
+        }
+
+        if (hanziIndex === -1 || pinyinIndex === -1 || meaningIndex === -1) {
+            throw new Error(`Import failed: Could not detect columns. Please ensure data is in order: hanzi, pinyin, meaning, example. First row: [${firstRow.join(', ')}]`);
+        }
+        
+        console.log(`Column mapping - Hanzi: ${hanziIndex}, Pinyin: ${pinyinIndex}, Meaning: ${meaningIndex}, Example: ${exampleIndex}, Has Header: ${hasHeader}`);
+        
+        // Skip first row only if it's a header
+        const dataRows = hasHeader ? jsonData.slice(1) : jsonData;
+
+        const newItems: VocabItem[] = dataRows.map((row, index) => {
+            console.log(`Processing row ${index + 1}:`, row);
+            
+            // Safely get values with fallback
+            const hanziRaw = row[hanziIndex];
+            const pinyinRaw = row[pinyinIndex];
+            const meaningRaw = row[meaningIndex];
+            const exampleRaw = exampleIndex > -1 ? row[exampleIndex] : '';
+
+            const hanzi = hanziRaw != null ? String(hanziRaw).trim() : '';
+            const pinyin = pinyinRaw != null ? String(pinyinRaw).trim() : '';
+            const meaning = meaningRaw != null ? String(meaningRaw).trim() : '';
+            const example = exampleRaw != null ? String(exampleRaw).trim() : '';
+
+            console.log(`  -> hanzi: "${hanzi}", pinyin: "${pinyin}", meaning: "${meaning}", example: "${example.substring(0, 30)}..."`);
+
+            // Skip only if ALL three main fields are empty
+            if (!hanzi && !pinyin && !meaning) {
+                console.warn(`Skipping completely empty row ${index + 1}`);
+                return null;
+            }
+
+            // Accept row even if only 1 or 2 fields have data
+            const vocabItem: VocabItem = {
+                id: `item-import-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+                hanzi: hanzi,
+                pinyin: pinyin,
+                meaning: meaning,
+            };
+
+            if (example) {
+                vocabItem.exampleSentence = example;
+            }
+
+            console.log(`  ✓ Created item:`, vocabItem);
+            return vocabItem;
+        }).filter((item): item is VocabItem => item !== null);
+
+        if (newItems.length > 0) {
+            setItems(newItems);
+            showToast(`Successfully imported ${newItems.length} items.`);
+        } else {
+            showToast("No valid new items were found in the file.");
+        }
+    } catch (error: any) {
+        console.error("Excel Parsing Error:", error);
+        showToast(`Import Error: ${error.message}`);
+    } finally {
+        if (target) {
+            target.value = '';
+        }
     }
   };
   
