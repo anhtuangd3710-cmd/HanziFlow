@@ -3,7 +3,7 @@ export interface User {
   _id: string;
   email: string;
   name: string;
-  token?: string; // Token is received on login
+  createdAt?: string; 
   // --- Gamification Fields ---
   xp: number;
   currentStreak: number;
@@ -93,9 +93,18 @@ export interface UserStats {
     }[];
 }
 
+// --- New Leaderboard User Type ---
+export interface LeaderboardUser {
+  _id: string;
+  name: string;
+  xp: number;
+  createdAt: string;
+}
+
 
 export interface AppState {
   user: User | null;
+  isAuthLoading: boolean; // For initial session check
   vocabSets: VocabSet[];
   setsPagination: {
     currentPage: number;
@@ -111,7 +120,9 @@ export interface AppState {
     limit: number;
   } | null;
   quizHistory: QuizHistory[];
+  profileQuizHistory: QuizHistory[] | null;
   userStats: UserStats | null;
+  leaderboard: LeaderboardUser[] | null;
   isLoading: boolean;
   isRequestingUserApiKey: boolean; // To show the API key modal
 }
@@ -119,11 +130,14 @@ export interface AppState {
 export type Action =
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
+  | { type: 'AUTH_LOADING'; payload: boolean }
   | { type: 'UPDATE_USER'; payload: Partial<User> }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SETS_LOADED'; payload: { sets: VocabSet[]; page: number; pages: number; total: number; } }
   | { type: 'UPDATE_SET'; payload: VocabSet }
   | { type: 'HISTORY_LOADED'; payload: QuizHistory[] }
+  | { type: 'PROFILE_HISTORY_LOADED'; payload: QuizHistory[] }
   | { type: 'PUBLIC_SETS_LOADED'; payload: { sets: VocabSet[]; page: number; pages: number; total: number; } }
   | { type: 'USER_STATS_LOADED'; payload: UserStats }
+  | { type: 'LEADERBOARD_LOADED'; payload: LeaderboardUser[] }
   | { type: 'REQUEST_USER_API_KEY'; payload: boolean }; // Action for the modal

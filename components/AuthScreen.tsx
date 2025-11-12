@@ -1,3 +1,4 @@
+
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AppContext } from '../context/AppContext';
 import Spinner from './Spinner';
@@ -62,20 +63,22 @@ const AuthScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
 
   // Validation state
-  const [errors, setErrors] = useState({ name: '', email: '', password: '' });
-  const [touched, setTouched] = useState({ name: false, email: false, password: false });
+  const [errors, setErrors] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [touched, setTouched] = useState({ name: false, email: false, password: false, confirmPassword: false });
 
   if (!context) return <div>Loading context...</div>;
   const { login, register, state } = context;
 
   // --- Validation Logic ---
   const validate = useCallback(() => {
-    const newErrors = { name: '', email: '', password: '' };
+    const newErrors = { name: '', email: '', password: '', confirmPassword: '' };
 
     // Name validation (only for register)
-    if (mode === 'register' && name.length < 3) {
+    if (mode === 'register' && name.trim().length < 3) {
       newErrors.name = 'Name must be at least 3 characters long.';
     }
 
@@ -96,31 +99,38 @@ const AuthScreen: React.FC = () => {
         else if (!/(?=.*\d)/.test(password)) newErrors.password = 'Must contain a number.';
         else if (!/(?=.*[\W_])/.test(password)) newErrors.password = 'Must contain a special character.';
     }
+
+    // Confirm Password validation
+    if (mode === 'register' && !confirmPassword) {
+        newErrors.confirmPassword = 'Please confirm your password.';
+    } else if (mode === 'register' && password !== confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match.';
+    }
     
     setErrors(newErrors);
     return Object.values(newErrors).every(x => x === '');
-  }, [name, email, password, mode]);
+  }, [name, email, password, confirmPassword, mode]);
 
   useEffect(() => {
-    if (touched.name || touched.email || touched.password) {
+    if (touched.name || touched.email || touched.password || touched.confirmPassword) {
         validate();
     }
-  }, [name, email, password, touched, validate]);
+  }, [name, email, password, confirmPassword, touched, validate]);
 
-  const handleBlur = (field: 'name' | 'email' | 'password') => {
+  const handleBlur = (field: 'name' | 'email' | 'password' | 'confirmPassword') => {
     setTouched(prev => ({ ...prev, [field]: true }));
   };
 
   // --- Handlers ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ name: true, email: true, password: true }); // Mark all as touched on submit
+    setTouched({ name: true, email: true, password: true, confirmPassword: true }); // Mark all as touched on submit
     
     if (validate()) {
       if (mode === 'register') {
         await register(name, email, password);
       } else {
-        await login(email, password);
+        await login(email, password, rememberMe);
       }
     }
   };
@@ -131,8 +141,9 @@ const AuthScreen: React.FC = () => {
     setName('');
     setEmail('');
     setPassword('');
-    setErrors({ name: '', email: '', password: '' });
-    setTouched({ name: false, email: false, password: false });
+    setConfirmPassword('');
+    setErrors({ name: '', email: '', password: '', confirmPassword: '' });
+    setTouched({ name: false, email: false, password: false, confirmPassword: false });
   };
   
 
@@ -158,15 +169,17 @@ const AuthScreen: React.FC = () => {
           </div>
           <form className="mt-8 space-y-6" onSubmit={handleSubmit} noValidate>
             <div className="rounded-md shadow-sm space-y-4">
-              <div className={`transition-all duration-500 ease-in-out overflow-hidden ${mode === 'register' ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className={`transition-all duration-500 ease-in-out overflow-hidden ${mode === 'register' ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
                 {mode === 'register' && (
-                    <div>
-                        <InputField id="name" type="text" placeholder="Your Name" value={name} 
-                            onChange={(e) => setName(e.target.value)}
-                            onBlur={() => handleBlur('name')}
-                            Icon={UserIcon} error={errors.name} isTouched={touched.name}
-                        />
-                        {touched.name && errors.name && <p className="mt-2 text-xs text-red-600">{errors.name}</p>}
+                    <div className='space-y-4'>
+                        <div>
+                            <InputField id="name" type="text" placeholder="Your Name" value={name} 
+                                onChange={(e) => setName(e.target.value)}
+                                onBlur={() => handleBlur('name')}
+                                Icon={UserIcon} error={errors.name} isTouched={touched.name}
+                            />
+                            {touched.name && errors.name && <p className="mt-2 text-xs text-red-600">{errors.name}</p>}
+                        </div>
                     </div>
                 )}
               </div>
@@ -188,6 +201,26 @@ const AuthScreen: React.FC = () => {
                 />
                 {touched.password && errors.password && <p className="mt-2 text-xs text-red-600">{errors.password}</p>}
               </div>
+
+               <div className={`transition-all duration-500 ease-in-out overflow-hidden ${mode === 'register' ? 'max-h-24 opacity-100' : 'max-h-0 opacity-0'}`}>
+                 {mode === 'register' && (
+                    <div>
+                        <InputField id="confirmPassword" type="password" placeholder="Confirm Password" value={confirmPassword} 
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            onBlur={() => handleBlur('confirmPassword')}
+                            Icon={LockIcon} error={errors.confirmPassword} isTouched={touched.confirmPassword}
+                        />
+                        {touched.confirmPassword && errors.confirmPassword && <p className="mt-2 text-xs text-red-600">{errors.confirmPassword}</p>}
+                    </div>
+                 )}
+               </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                    <input id="remember-me" name="remember-me" type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" />
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">Remember me</label>
+                </div>
             </div>
 
             <div>

@@ -1,10 +1,6 @@
-import { User, VocabSet, QuizHistory, QuizResultType, UserStats } from '../types';
+import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser } from '../types';
 
 const API_URL = process.env.URL; // Your backend URL
-
-// import { User, VocabSet, QuizHistory, QuizResultType, UserStats } from '../types';
-
-// const API_URL = 'http://localhost:5001/api'; // Your backend URL
 
 // Custom error for auth failures
 export class AuthError extends Error {
@@ -14,79 +10,131 @@ export class AuthError extends Error {
   }
 }
 
-// Helper to get the token from localStorage
-const getToken = (): string | null => {
-    const storedUser = localStorage.getItem('hanziflow_user');
-    if (storedUser) {
-        try {
-            const user = JSON.parse(storedUser);
-            return user.token || null;
-        } catch {
-            return null;
-        }
+// In-memory token storage
+let accessToken: string | null = null;
+let isRefreshing = false;
+let failedQueue: { resolve: (value: unknown) => void; reject: (reason?: any) => void; }[] = [];
+
+const processQueue = (error: Error | null, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
     }
-    return null;
+  });
+  failedQueue = [];
 };
 
-// Centralized fetch wrapper for authenticated routes
+// Centralized fetch wrapper with token refresh logic
 const apiFetch = async (url: string, options: RequestInit = {}) => {
-    const token = getToken();
-
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
         ...options.headers,
     };
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+
+    if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    const res = await fetch(url, { ...options, headers });
+    const makeRequest = async () => {
+        const res = await fetch(url, { ...options, headers, credentials: 'include' });
 
-    if (res.status === 401) {
-        throw new AuthError('Your session has expired. Please log in again.');
-    }
+        if (!res.ok) {
+            if (res.status === 401) {
+                if (isRefreshing) {
+                    // If a refresh is already in progress, wait for it to complete
+                    return new Promise((resolve, reject) => {
+                        failedQueue.push({ resolve: () => resolve(makeRequest()), reject });
+                    }).catch(() => {
+                        // If the refresh fails, the original request should also fail.
+                        throw new AuthError('Your session has expired. Please log in again.');
+                    });
+                }
+                
+                isRefreshing = true;
 
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: `Request failed with status ${res.status}` }));
-        throw new Error(errorData.message || `An unknown API error occurred.`);
-    }
-    
-    // Handle responses with no content (e.g., DELETE 204)
-    if (res.status === 204) {
-        return;
-    }
+                try {
+                    const newAccessToken = await refreshToken();
+                    accessToken = newAccessToken;
+                    headers['Authorization'] = `Bearer ${newAccessToken}`;
+                    processQueue(null, newAccessToken);
+                    return makeRequest(); // Retry the original request with the new token
+                } catch (refreshError) {
+                    logoutUser(); // If refresh fails, log out
+                    processQueue(refreshError as Error, null);
+                    throw new AuthError('Your session has expired. Please log in again.');
+                } finally {
+                    isRefreshing = false;
+                }
+            }
+            const errorData = await res.json().catch(() => ({ message: `Request failed with status ${res.status}` }));
+            throw new Error(errorData.message || `An unknown API error occurred.`);
+        }
+        
+        if (res.status === 204) {
+            return;
+        }
+        return res.json();
+    };
 
-    return res.json();
+    return makeRequest();
 };
 
 
-// --- Auth (These do not use apiFetch as they don't require a token) ---
-export const loginUser = async (email: string, password: string): Promise<User> => {
-    const res = await fetch(`${API_URL}/users/login`, {
+// --- Auth Endpoints ---
+export const loginUser = async (email: string, password: string, rememberMe: boolean): Promise<User> => {
+    const user = await apiFetch(`${API_URL}/users/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
     });
-
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Login failed');
-    }
-    return await res.json();
+    accessToken = user.accessToken;
+    // We only care about the user data, not the token here
+    const { accessToken: _, ...userData } = user;
+    return userData;
 };
 
 export const registerUser = async (name: string, email: string, password: string): Promise<User> => {
-    const res = await fetch(`${API_URL}/users/register`, {
+    const user = await apiFetch(`${API_URL}/users/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
     });
+    accessToken = user.accessToken;
+    const { accessToken: _, ...userData } = user;
+    return userData;
+};
 
-    if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Registration failed');
+export const logoutUser = async (): Promise<void> => {
+    try {
+        await apiFetch(`${API_URL}/users/logout`, { method: 'POST' });
+    } catch (error) {
+        console.error("Logout API call failed, but logging out client-side anyway.", error);
+    } finally {
+        accessToken = null; // Clear the token from memory
     }
-    return await res.json();
+};
+
+const refreshToken = async (): Promise<string> => {
+    const res = await apiFetch(`${API_URL}/users/refresh`, { method: 'POST' });
+    return res.accessToken;
+};
+
+export const getProfile = async (): Promise<User> => {
+    const user = await apiFetch(`${API_URL}/users/profile`);
+    accessToken = user.accessToken;
+    const { accessToken: _, ...userData } = user;
+    return userData;
+};
+
+
+export const updateUserProfile = async (userData: { name: string }): Promise<User> => {
+    const user = await apiFetch(`${API_URL}/users/profile`, {
+        method: 'PUT',
+        body: JSON.stringify(userData),
+    });
+     accessToken = user.accessToken;
+    const { accessToken: _, ...userDataWithoutToken } = user;
+    return userDataWithoutToken;
 };
 
 
@@ -115,8 +163,9 @@ export const deleteSet = async (setId: string): Promise<void> => {
 };
 
 // --- Quiz History ---
-export const getQuizHistory = async (): Promise<QuizHistory[]> => {
-    return apiFetch(`${API_URL}/history`);
+export const getQuizHistory = async (limit?: number): Promise<QuizHistory[]> => {
+    const url = limit ? `${API_URL}/history?limit=${limit}` : `${API_URL}/history`;
+    return apiFetch(url);
 };
 
 export const saveQuizResult = async (setId: string, result: QuizResultType): Promise<{ updatedUser: Partial<User>, updatedSet?: VocabSet }> => {
@@ -131,7 +180,7 @@ export const saveQuizResult = async (setId: string, result: QuizResultType): Pro
     });
 };
 
-// --- New User Stats Endpoint ---
+// --- User Stats Endpoint ---
 export const getUserStats = async (): Promise<UserStats> => {
     return apiFetch(`${API_URL}/history/stats`);
 };
@@ -155,4 +204,9 @@ export const getPublicSetDetails = async (setId: string): Promise<VocabSet> => {
 
 export const cloneSet = async (setId: string): Promise<{ newSet: VocabSet, updatedUser: Partial<User> }> => {
     return apiFetch(`${API_URL}/sets/clone/${setId}`, { method: 'POST' });
+};
+
+// --- Leaderboard ---
+export const getLeaderboard = async (): Promise<LeaderboardUser[]> => {
+    return apiFetch(`${API_URL}/users/leaderboard`);
 };

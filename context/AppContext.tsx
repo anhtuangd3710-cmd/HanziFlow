@@ -1,6 +1,6 @@
 
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
-import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats } from '../types';
+import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats, LeaderboardUser } from '../types';
 import * as api from '../services/api';
 import { AuthError } from '../services/api'; // Import the custom error type
 import * as geminiService from '../services/geminiService';
@@ -12,7 +12,9 @@ const initialState: AppState = {
   publicSets: [],
   publicSetsPagination: null,
   quizHistory: [],
+  profileQuizHistory: null,
   userStats: null,
+  leaderboard: null,
   isLoading: false,
   isRequestingUserApiKey: false,
 };
@@ -36,7 +38,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
               currentPage: action.payload.page,
               totalPages: action.payload.pages,
               totalSets: action.payload.total,
-              limit: 8 // This should match the backend limit
+              limit: 6 // This should match the backend limit
           }
       };
     case 'PUBLIC_SETS_LOADED':
@@ -47,7 +49,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
           currentPage: action.payload.page,
           totalPages: action.payload.pages,
           totalSets: action.payload.total,
-          limit: 8 // This should match the backend limit
+          limit: 9 // This should match the backend limit
         },
         isLoading: false 
       };
@@ -60,8 +62,12 @@ const appReducer = (state: AppState, action: Action): AppState => {
       };
     case 'HISTORY_LOADED':
         return { ...state, quizHistory: action.payload };
+    case 'PROFILE_HISTORY_LOADED':
+        return { ...state, profileQuizHistory: action.payload, isLoading: false };
     case 'USER_STATS_LOADED':
         return { ...state, userStats: action.payload };
+    case 'LEADERBOARD_LOADED':
+        return { ...state, leaderboard: action.payload, isLoading: false };
     case 'REQUEST_USER_API_KEY':
         return { ...state, isRequestingUserApiKey: action.payload };
     default:
@@ -71,7 +77,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
 interface AppContextType {
     state: AppState;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string, rememberMe: boolean) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
     logout: () => void;
     fetchSets: (page: number) => Promise<void>;
@@ -84,18 +90,24 @@ interface AppContextType {
     fetchPublicSets: (page: number, searchTerm?: string) => Promise<void>;
     cloneSet: (setId: string) => Promise<VocabSet | undefined>;
     closeApiKeyModal: () => void;
+    fetchProfileHistory: () => Promise<void>;
+    updateUserProfile: (userData: { name: string }) => Promise<void>;
+    fetchLeaderboard: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const STORAGE_KEY = 'hanziflow_user';
+
 const getInitialState = (): AppState => {
-    const storedUser = localStorage.getItem('hanziflow_user');
+    const storedUser = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
     let user: User | null = null;
     if (storedUser) {
         try {
             user = JSON.parse(storedUser);
         } catch {
-            localStorage.removeItem('hanziflow_user');
+            localStorage.removeItem(STORAGE_KEY);
+            sessionStorage.removeItem(STORAGE_KEY);
         }
     }
     return { ...initialState, user };
@@ -106,11 +118,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const closeApiKeyModal = () => dispatch({ type: 'REQUEST_USER_API_KEY', payload: false });
 
-    const login = async (email: string, password: string) => {
+    const login = async (email: string, password: string, rememberMe: boolean) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const userWithToken = await api.loginUser(email, password);
-            localStorage.setItem('hanziflow_user', JSON.stringify(userWithToken));
+            const storage = rememberMe ? localStorage : sessionStorage;
+            storage.setItem(STORAGE_KEY, JSON.stringify(userWithToken));
             dispatch({ type: 'LOGIN', payload: userWithToken });
         } catch (error) {
             console.error(error);
@@ -123,7 +136,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const userWithToken = await api.registerUser(name, email, password);
-            localStorage.setItem('hanziflow_user', JSON.stringify(userWithToken));
+            // Default to session storage on register, user can re-login with "remember me"
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userWithToken));
             dispatch({ type: 'LOGIN', payload: userWithToken });
         } catch (error) {
             console.error(error);
@@ -133,7 +147,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const logout = useCallback(() => {
-        localStorage.removeItem('hanziflow_user');
+        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
         dispatch({ type: 'LOGOUT' });
     }, []);
 
@@ -141,7 +156,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!state.user?.token) return;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const data = await api.getSets(page, 8);
+            const data = await api.getSets(page, 6);
             dispatch({ type: 'SETS_LOADED', payload: data });
         } catch(error) {
             console.error("Failed to fetch sets:", error);
@@ -161,7 +176,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             // Fetch sets, history, and global stats concurrently
             const [, history, stats] = await Promise.all([
                 fetchSets(1),
-                api.getQuizHistory(),
+                api.getQuizHistory(20), // Limit dashboard history
                 api.getUserStats()
             ]);
             dispatch({ type: 'HISTORY_LOADED', payload: history });
@@ -240,7 +255,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const { updatedUser, updatedSet } = await api.saveQuizResult(setId, result);
             
             // Refetch history to ensure consistency and prevent duplicates
-            const freshHistory = await api.getQuizHistory();
+            const freshHistory = await api.getQuizHistory(20);
             dispatch({ type: 'HISTORY_LOADED', payload: freshHistory });
 
             dispatch({ type: 'UPDATE_USER', payload: updatedUser });
@@ -252,12 +267,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const stats = await api.getUserStats();
             dispatch({ type: 'USER_STATS_LOADED', payload: stats });
 
-
-            const storedUser = localStorage.getItem('hanziflow_user');
+            const storedUser = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
             if (storedUser) {
+                const storage = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
                 const user = JSON.parse(storedUser);
                 const updatedStoredUser = { ...user, ...updatedUser };
-                localStorage.setItem('hanziflow_user', JSON.stringify(updatedStoredUser));
+                storage.setItem(STORAGE_KEY, JSON.stringify(updatedStoredUser));
             }
 
         } catch (error) {
@@ -365,12 +380,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const stats = await api.getUserStats();
             dispatch({ type: 'USER_STATS_LOADED', payload: stats });
 
-
-            const storedUser = localStorage.getItem('hanziflow_user');
+            const storedUser = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
             if (storedUser) {
+                const storage = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
                 const user = JSON.parse(storedUser);
                 const updatedStoredUser = { ...user, ...updatedUser };
-                localStorage.setItem('hanziflow_user', JSON.stringify(updatedStoredUser));
+                storage.setItem(STORAGE_KEY, JSON.stringify(updatedStoredUser));
             }
             
             alert(`Set "${newSet.title}" has been added to your collection!`);
@@ -388,6 +403,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
+    const fetchProfileHistory = async () => {
+        if (!state.user) return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const fullHistory = await api.getQuizHistory(); // No limit
+            dispatch({ type: 'PROFILE_HISTORY_LOADED', payload: fullHistory });
+        } catch (error) {
+            console.error("Failed to fetch full history:", error);
+            if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            }
+        }
+    };
+
+    const updateUserProfile = async (userData: { name: string }) => {
+        if (!state.user) return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const updatedUserWithToken = await api.updateUserProfile(userData);
+
+            const storage = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
+            storage.setItem(STORAGE_KEY, JSON.stringify(updatedUserWithToken));
+            
+            // Use LOGIN action to update user and token state comprehensively
+            dispatch({ type: 'LOGIN', payload: updatedUserWithToken });
+            alert('Profile updated successfully!');
+        } catch (error) {
+            console.error("Failed to update profile:", error);
+            alert((error as Error).message);
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    };
+
+    const fetchLeaderboard = useCallback(async () => {
+        if (!state.user) return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const data = await api.getLeaderboard();
+            dispatch({ type: 'LEADERBOARD_LOADED', payload: data });
+        } catch (error) {
+            console.error("Failed to fetch leaderboard:", error);
+             if (error instanceof AuthError) {
+                alert(error.message);
+                logout();
+            } else {
+                 alert("Could not load the leaderboard.");
+            }
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    }, [state.user, logout]);
+
     useEffect(() => {
         if (state.user) {
             fetchInitialData();
@@ -397,7 +465,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal }}>
+    <AppContext.Provider value={{ state, login, register, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal, fetchProfileHistory, updateUserProfile, fetchLeaderboard }}>
       {children}
     </AppContext.Provider>
   );
