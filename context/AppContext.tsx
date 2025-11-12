@@ -1,6 +1,5 @@
-
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
-import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats, LeaderboardUser } from '../types';
+import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats, LeaderboardUser, AdminStats, AdminUser } from '../types';
 import * as api from '../services/api';
 import { AuthError } from '../services/api'; // Import the custom error type
 import * as geminiService from '../services/geminiService';
@@ -17,6 +16,9 @@ const initialState: AppState = {
   leaderboard: null,
   isLoading: false,
   isRequestingUserApiKey: false,
+  adminStats: null,
+  adminUsers: null,
+  adminUsersPagination: null,
 };
 
 const appReducer = (state: AppState, action: Action): AppState => {
@@ -70,6 +72,18 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, leaderboard: action.payload, isLoading: false };
     case 'REQUEST_USER_API_KEY':
         return { ...state, isRequestingUserApiKey: action.payload };
+    case 'ADMIN_STATS_LOADED':
+        return { ...state, adminStats: action.payload, isLoading: false };
+    case 'ADMIN_USERS_LOADED':
+        return {
+            ...state,
+            adminUsers: action.payload.users,
+            adminUsersPagination: {
+                currentPage: action.payload.page,
+                totalPages: action.payload.pages,
+            },
+            isLoading: false,
+        };
     default:
       return state;
   }
@@ -93,6 +107,10 @@ interface AppContextType {
     fetchProfileHistory: () => Promise<void>;
     updateUserProfile: (userData: { name: string }) => Promise<void>;
     fetchLeaderboard: () => Promise<void>;
+    // --- Admin Functions ---
+    fetchAdminStats: () => Promise<void>;
+    fetchAdminUsers: (page: number) => Promise<void>;
+    adminDeleteUser: (userId: string) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -438,7 +456,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const fetchLeaderboard = useCallback(async () => {
-        if (!state.user) return;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
             const data = await api.getLeaderboard();
@@ -454,7 +471,47 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.user, logout]);
+    }, [logout]);
+
+    // --- Admin Functions ---
+    const fetchAdminStats = useCallback(async () => {
+        if (state.user?.role !== 'admin') return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const stats = await api.getAdminStats();
+            dispatch({ type: 'ADMIN_STATS_LOADED', payload: stats });
+        } catch (error) {
+            console.error("Failed to fetch admin stats:", error);
+            alert("Could not load admin statistics.");
+        }
+    }, [state.user?.role]);
+
+    const fetchAdminUsers = useCallback(async (page: number) => {
+        if (state.user?.role !== 'admin') return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            const data = await api.getAdminAllUsers(page, 10);
+            dispatch({ type: 'ADMIN_USERS_LOADED', payload: data });
+        } catch (error) {
+            console.error("Failed to fetch admin users:", error);
+            alert("Could not load user list.");
+        }
+    }, [state.user?.role]);
+    
+    const adminDeleteUser = useCallback(async (userId: string) => {
+        if (state.user?.role !== 'admin') return;
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            await api.adminDeleteUser(userId);
+            // Refetch current page of users
+            await fetchAdminUsers(state.adminUsersPagination?.currentPage || 1);
+            alert("User deleted successfully.");
+        } catch(error) {
+            console.error("Failed to delete user:", error);
+            alert((error as Error).message);
+        }
+    }, [state.user?.role, fetchAdminUsers, state.adminUsersPagination?.currentPage]);
+
 
     useEffect(() => {
         if (state.user) {
@@ -465,7 +522,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal, fetchProfileHistory, updateUserProfile, fetchLeaderboard }}>
+    <AppContext.Provider value={{ state, login, register, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal, fetchProfileHistory, updateUserProfile, fetchLeaderboard, fetchAdminStats, fetchAdminUsers, adminDeleteUser }}>
       {children}
     </AppContext.Provider>
   );

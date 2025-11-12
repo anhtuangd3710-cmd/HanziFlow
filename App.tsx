@@ -18,6 +18,7 @@ const CommunityView = lazy(() => import('./components/CommunityView'));
 const PublicSetPreview = lazy(() => import('./components/PublicSetPreview'));
 const ProfileView = lazy(() => import('./components/ProfileView'));
 const LeaderboardView = lazy(() => import('./components/LeaderboardView'));
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
 
 
 const ProtectedLayout: React.FC = () => (
@@ -49,11 +50,21 @@ const App: React.FC = () => {
 
   const { state, closeApiKeyModal } = context;
 
+  const isAdmin = state.user?.role === 'admin';
+
   return (
     <>
       {state.isRequestingUserApiKey && <ApiKeyModal onClose={closeApiKeyModal} />}
       <Routes>
         <Route path="/login" element={state.user ? <Navigate to="/" /> : <AuthScreen />} />
+        
+        {/* Admin Routes */}
+        <Route 
+          path="/admin/*" 
+          element={isAdmin ? <AdminLayout /> : <Navigate to="/" />}
+        />
+
+        {/* User Routes */}
         <Route
           path="/*"
           element={state.user ? <ProtectedLayout /> : <Navigate to="/login" />}

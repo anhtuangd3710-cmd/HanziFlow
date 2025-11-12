@@ -7,6 +7,7 @@ import { UsersIcon } from './icons/UsersIcon';
 import { UserCircleIcon } from './icons/UserCircleIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
+import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 
 
 const Header: React.FC = () => {
@@ -91,6 +92,12 @@ const Header: React.FC = () => {
                           <Link to="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                               My Profile
                           </Link>
+                          {user.role === 'admin' && (
+                              <Link to="/admin" onClick={() => setIsDropdownOpen(false)} className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <ShieldCheckIcon size={16} className="mr-2" />
+                                Admin Panel
+                              </Link>
+                          )}
                           <div className="border-t border-gray-100 my-1"></div>
                           <button onClick={handleLogout} className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50">
                               Logout

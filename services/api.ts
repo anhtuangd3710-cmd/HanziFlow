@@ -1,6 +1,10 @@
-import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser } from '../types';
+import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser, AdminStats, AdminUser } from '../types';
 
 const API_URL = process.env.URL; // Your backend URL
+
+// import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser, AdminStats, AdminUser } from '../types';
+
+// const API_URL = 'http://localhost:5001/api'; // Your backend URL
 
 // Custom error for auth failures
 export class AuthError extends Error {
@@ -40,6 +44,10 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
 
     if (res.status === 401) {
         throw new AuthError('Your session has expired. Please log in again.');
+    }
+
+    if (res.status === 403) {
+        throw new AuthError('You are not authorized to perform this action.');
     }
 
     if (!res.ok) {
@@ -164,4 +172,21 @@ export const cloneSet = async (setId: string): Promise<{ newSet: VocabSet, updat
 // --- Leaderboard ---
 export const getLeaderboard = async (): Promise<LeaderboardUser[]> => {
     return apiFetch(`${API_URL}/users/leaderboard`);
+};
+
+// --- Admin ---
+export const getAdminStats = async (): Promise<AdminStats> => {
+    return apiFetch(`${API_URL}/admin/stats`);
+};
+
+export const getAdminAllUsers = async (page: number, limit: number): Promise<{ users: AdminUser[]; page: number; pages: number; }> => {
+    return apiFetch(`${API_URL}/admin/users?page=${page}&limit=${limit}`);
+};
+
+export const adminDeleteUser = async (userId: string): Promise<void> => {
+    return apiFetch(`${API_URL}/admin/users/${userId}`, { method: 'DELETE' });
+};
+
+export const exportAllUsers = async (): Promise<AdminUser[]> => {
+    return apiFetch(`${API_URL}/admin/export/users`);
 };

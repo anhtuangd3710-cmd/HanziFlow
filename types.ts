@@ -5,6 +5,7 @@ export interface User {
   name: string;
   token?: string; // Token is received on login
   createdAt?: string; // Added from backend timestamps
+  role?: 'user' | 'admin';
   // --- Gamification Fields ---
   xp: number;
   currentStreak: number;
@@ -102,6 +103,13 @@ export interface LeaderboardUser {
   createdAt: string;
 }
 
+// --- Admin Panel Types ---
+export interface AdminStats {
+  userCount: number;
+  setCount: number;
+}
+export type AdminUser = Pick<User, '_id' | 'name' | 'email' | 'xp' | 'createdAt' | 'role'>;
+
 
 export interface AppState {
   user: User | null;
@@ -125,6 +133,13 @@ export interface AppState {
   leaderboard: LeaderboardUser[] | null;
   isLoading: boolean;
   isRequestingUserApiKey: boolean; // To show the API key modal
+  // --- Admin State ---
+  adminStats: AdminStats | null;
+  adminUsers: AdminUser[] | null;
+  adminUsersPagination: {
+    currentPage: number;
+    totalPages: number;
+  } | null;
 }
 
 export type Action =
@@ -139,4 +154,7 @@ export type Action =
   | { type: 'PUBLIC_SETS_LOADED'; payload: { sets: VocabSet[]; page: number; pages: number; total: number; } }
   | { type: 'USER_STATS_LOADED'; payload: UserStats }
   | { type: 'LEADERBOARD_LOADED'; payload: LeaderboardUser[] }
-  | { type: 'REQUEST_USER_API_KEY'; payload: boolean }; // Action for the modal
+  | { type: 'REQUEST_USER_API_KEY'; payload: boolean }
+  // --- Admin Actions ---
+  | { type: 'ADMIN_STATS_LOADED'; payload: AdminStats }
+  | { type: 'ADMIN_USERS_LOADED'; payload: { users: AdminUser[], page: number, pages: number } };
