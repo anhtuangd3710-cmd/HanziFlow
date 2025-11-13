@@ -1,7 +1,6 @@
 import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser, AdminStats, AdminUser } from './types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL 
 // Custom error for auth failures
 export class AuthError extends Error {
   constructor(message: string) {
