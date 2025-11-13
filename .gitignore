@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 .env
+.env.local
+.env.*.local
+
+# Next.js
+.next
+out
+build
 
 # Editor directories and files
 .vscode/*
@@ -23,3 +30,26 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OS
+Thumbs.db
+.AppleDouble
+.LSOverride
+*.pem
+
+# Testing
+coverage
+.nyc_output
+
+# IDE
+*.iml
+.vscode/
+.idea/
+
+# Misc
+.cache
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
