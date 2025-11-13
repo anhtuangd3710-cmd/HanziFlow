@@ -1,7 +1,7 @@
 
 import React, { useState, useContext } from 'react';
-import { AppContext } from '../context/AppContext';
-import { User } from '../types';
+import { AppContext } from '@/context/AppContext';
+import { User } from '@/lib/types';
 import Spinner from './Spinner';
 
 interface Props {

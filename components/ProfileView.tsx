@@ -1,6 +1,6 @@
 
 import React, { useContext, useEffect, useState } from 'react';
-import { AppContext } from '../context/AppContext';
+import { AppContext } from '@/context/AppContext';
 import { UserCircleIcon } from './icons/UserCircleIcon';
 import { EditIcon } from './icons/EditIcon';
 import { AwardIcon } from './icons/AwardIcon';
@@ -9,7 +9,7 @@ import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import Spinner from './Spinner';
 import EditProfileModal from './EditProfileModal';
-import { QuizHistory } from '../types';
+import { QuizHistory } from '@/lib/types';
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number }> = ({ icon, label, value }) => (
     <div className="bg-gray-50 p-4 rounded-lg flex items-center">

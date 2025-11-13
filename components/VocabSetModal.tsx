@@ -1,7 +1,9 @@
+'use client';
+
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { AppContext } from '../context/AppContext';
-import { VocabSet, VocabItem, Difficulty } from '../types';
+import { AppContext } from '@/context/AppContext';
+import { VocabSet, VocabItem, Difficulty } from '@/lib/types';
 import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { UploadIcon } from './icons/UploadIcon';

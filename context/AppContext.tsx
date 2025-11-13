@@ -1,11 +1,14 @@
+'use client';
+
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
-import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats, LeaderboardUser, AdminStats, AdminUser } from '../types';
-import * as api from '../services/api';
-import { AuthError } from '../services/api'; // Import the custom error type
-import * as geminiService from '../services/geminiService';
+import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats, LeaderboardUser, AdminStats, AdminUser } from '@/lib/types';
+import * as api from '@/lib/api';
+import { AuthError } from '@/lib/api';
+import * as geminiService from '@/lib/geminiService';
 
 const initialState: AppState = {
   user: null,
+  isHydrated: false,
   vocabSets: [],
   setsPagination: null,
   publicSets: [],
@@ -24,9 +27,11 @@ const initialState: AppState = {
 const appReducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
     case 'LOGIN':
-      return { ...state, user: action.payload, isLoading: false };
+      return { ...state, user: action.payload, isLoading: false, isHydrated: true };
     case 'LOGOUT':
-      return { ...initialState };
+      return { ...initialState, isHydrated: true };
+    case 'HYDRATE':
+      return { ...state, user: action.payload, isHydrated: true };
     case 'UPDATE_USER':
       if (!state.user) return state;
       return { ...state, user: { ...state.user, ...action.payload } };
@@ -79,8 +84,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
             ...state,
             adminUsers: action.payload.users,
             adminUsersPagination: {
-                currentPage: action.payload.page,
-                totalPages: action.payload.pages,
+                currentPage: action.payload.currentPage,
+                totalPages: action.payload.totalPages,
             },
             isLoading: false,
         };
@@ -118,6 +123,9 @@ export const AppContext = createContext<AppContextType | undefined>(undefined);
 const STORAGE_KEY = 'hanziflow_user';
 
 const getInitialState = (): AppState => {
+    if (typeof window === 'undefined') {
+        return initialState;
+    }
     const storedUser = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
     let user: User | null = null;
     if (storedUser) {
@@ -132,7 +140,24 @@ const getInitialState = (): AppState => {
 };
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [state, dispatch] = useReducer(appReducer, getInitialState());
+    const [state, dispatch] = useReducer(appReducer, initialState);
+    
+    // Hydrate user from localStorage/sessionStorage on client mount
+    useEffect(() => {
+        const storedUser = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+        if (storedUser) {
+            try {
+                const user = JSON.parse(storedUser);
+                dispatch({ type: 'HYDRATE', payload: user });
+            } catch {
+                localStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem(STORAGE_KEY);
+                dispatch({ type: 'HYDRATE', payload: null });
+            }
+        } else {
+            dispatch({ type: 'HYDRATE', payload: null });
+        }
+    }, []);
 
     const closeApiKeyModal = () => dispatch({ type: 'REQUEST_USER_API_KEY', payload: false });
 

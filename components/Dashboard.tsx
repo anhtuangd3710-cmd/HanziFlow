@@ -1,8 +1,10 @@
+'use client';
+
 
 import React, { useState, useContext, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
-import { VocabSet, QuizHistory, QuestionType } from '../types';
+import { useRouter } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
+import { VocabSet, QuizHistory, QuestionType } from '@/lib/types';
 import VocabSetModal from './VocabSetModal';
 import { PlusIcon } from './icons/PlusIcon';
 import Spinner from './Spinner';
@@ -38,7 +40,7 @@ const Dashboard: React.FC = () => {
   const [isSessionSetupOpen, setIsSessionSetupOpen] = useState(false);
   const [activeSet, setActiveSet] = useState<VocabSet | null>(null);
   const [editingSet, setEditingSet] = useState<VocabSet | null>(null);
-  const navigate = useNavigate();
+  const router = useRouter();
   
   if (!context) return <Spinner />;
   const { state, deleteSet, fetchSets } = context;
@@ -71,12 +73,12 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const handleReviewQuiz = useCallback((setId: string) => {
-    navigate(`/set/${setId}/quiz`, { state: { quizType: 'review' } });
-  }, [navigate]);
+    router.push(`/set/${setId}/quiz?quizType=review`);
+  }, [router]);
 
   const handleProgress = useCallback((setId: string) => {
-    navigate(`/set/${setId}/progress`);
-  }, [navigate]);
+    router.push(`/set/${setId}/progress`);
+  }, [router]);
   
   const handleOpenReviewModal = useCallback(() => {
       if (state.userStats && state.userStats.setsForReview.length > 0) {

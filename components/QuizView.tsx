@@ -1,10 +1,12 @@
+'use client';
+
 
 import React, { useState, useContext, useMemo, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
-import { VocabItem, QuizQuestion, QuizResultType, QuestionType, VocabSet } from '../types';
-import { speakText } from '../services/geminiService';
-import { getSetById } from '../services/api';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
+import { VocabItem, QuizQuestion, QuizResultType, QuestionType, VocabSet } from '@/lib/types';
+import { speakText } from '@/lib/geminiService';
+import { getSetById } from '@/lib/api';
 import { Volume2Icon } from './icons/Volume2Icon';
 import Spinner from './Spinner';
 
@@ -77,10 +79,14 @@ const playTone = (frequency: number, duration: number, type: OscillatorType = 's
 };
 
 const QuizView: React.FC = () => {
-  const { setId } = useParams<{ setId: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { quizType, questionTypes, questionCount } = (location.state as LocationState) || { quizType: 'standard' };
+  const params = useParams<{ setId: string }>();
+  const setId = params.setId;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  const quizType = (searchParams.get('quizType') as 'standard' | 'review') || 'standard';
+  const questionTypes = searchParams.get('types')?.split(',') as QuestionType[] || [];
+  const questionCount = parseInt(searchParams.get('questionCount') || '10');
   
   const context = useContext(AppContext);
   
@@ -213,7 +219,7 @@ const QuizView: React.FC = () => {
         if (setId) {
             await saveQuizResult(setId, result);
         }
-        navigate(`/set/${setId}/result`, { state: { quizResult: result, quizType, questionTypes, questionCount } });
+        router.push(`/set/${setId}/result`);
       }
     }, 1200);
   };
@@ -246,7 +252,7 @@ const QuizView: React.FC = () => {
                     : ` This set only has ${itemsForQuiz.length} word${itemsForQuiz.length === 1 ? '' : 's'}.`
                 }
             </p>
-            <button onClick={() => navigate('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button onClick={() => router.push('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 Back to Dashboard
             </button>
         </div>
@@ -329,7 +335,7 @@ const QuizView: React.FC = () => {
             {renderQuestionPrompt()}
         </div>
         {renderAnswerArea()}
-         <button onClick={() => navigate('/')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold"> ← Quit Quiz </button>
+         <button onClick={() => router.push('/')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold"> ← Quit Quiz </button>
     </div>
   );
 };

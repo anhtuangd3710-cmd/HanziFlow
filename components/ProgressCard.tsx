@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { User, UserStats } from '../types';
+import { User, UserStats } from '@/lib/types';
 import { FlameIcon } from './icons/FlameIcon';
 import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
 import { CalendarCheckIcon } from './icons/CalendarCheckIcon';

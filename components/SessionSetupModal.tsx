@@ -1,7 +1,9 @@
+'use client';
+
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { VocabSet, QuestionType } from '../types';
+import { useRouter } from 'next/navigation';
+import { VocabSet, QuestionType } from '@/lib/types';
 import { XIcon } from './icons/XIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { HelpCircleIcon } from './icons/HelpCircleIcon';
@@ -13,7 +15,7 @@ interface Props {
 }
 
 const SessionSetupModal: React.FC<Props> = ({ set, onClose }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [mode, setMode] = useState<'study' | 'quiz'>('study');
   
   // Study state
@@ -28,12 +30,23 @@ const SessionSetupModal: React.FC<Props> = ({ set, onClose }) => {
 
   const handleStart = () => {
     if (mode === 'study') {
-      navigate(`/set/${set._id}/study`, { state: { studyMode } });
+      router.push(`/set/${set._id}/study?studyMode=${studyMode}`);
     } else {
       if (quizMode === 'lightning') {
-        navigate(`/set/${set._id}/lightning-quiz`, { state: { questionCount, questionTypes } });
+        const params = new URLSearchParams();
+        params.append('questionCount', String(questionCount));
+        if (questionTypes.length > 0) {
+          params.append('types', questionTypes.join(','));
+        }
+        router.push(`/set/${set._id}/lightning-quiz?${params.toString()}`);
       } else {
-        navigate(`/set/${set._id}/quiz`, { state: { quizType: 'standard', questionCount, questionTypes } });
+        const params = new URLSearchParams();
+        params.append('quizType', 'standard');
+        params.append('questionCount', String(questionCount));
+        if (questionTypes.length > 0) {
+          params.append('types', questionTypes.join(','));
+        }
+        router.push(`/set/${set._id}/quiz?${params.toString()}`);
       }
     }
     onClose();

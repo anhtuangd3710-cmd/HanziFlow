@@ -1,6 +1,8 @@
+'use client';
+
 
 import React, { useState, useRef, useEffect } from 'react';
-import { VocabSet, QuestionType } from '../types';
+import { VocabSet, QuestionType } from '@/lib/types';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import { HelpCircleIcon } from './icons/HelpCircleIcon';
 import { EditIcon } from './icons/EditIcon';

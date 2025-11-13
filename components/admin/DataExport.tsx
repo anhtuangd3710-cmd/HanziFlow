@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { exportAllUsers } from '../../services/api';
+import { exportAllUsers } from '@/lib/api';
 import Spinner from '../Spinner';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { HelpCircleIcon } from '../icons/HelpCircleIcon';

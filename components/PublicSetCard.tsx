@@ -1,5 +1,5 @@
 import React from 'react';
-import { VocabSet } from '../types';
+import { VocabSet } from '@/lib/types';
 import { UsersIcon } from './icons/UsersIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 

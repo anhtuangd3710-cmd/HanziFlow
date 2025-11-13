@@ -18,10 +18,10 @@ const UserManagement: React.FC = () => {
     const context = useContext(AppContext);
 
     useEffect(() => {
-        if (context && !context.state.adminUsers) {
+        if (context?.state.user?.role === 'admin' && !context.state.adminUsers) {
             context.fetchAdminUsers(1);
         }
-    }, [context]);
+    }, []); // Empty dependency - fetch only on mount
 
     if (!context) return null;
     const { state, fetchAdminUsers, adminDeleteUser } = context;

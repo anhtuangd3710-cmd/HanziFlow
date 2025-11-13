@@ -1,10 +1,12 @@
+'use client';
+
 
 import React, { useState, useContext, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
-import { VocabItem, QuizQuestion, QuizResultType, QuestionType, VocabSet } from '../types';
-import { speakText } from '../services/geminiService';
-import { getSetById } from '../services/api';
+import { useParams, useSearchParams } from 'next/navigation'; import { useRouter } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
+import { VocabItem, QuizQuestion, QuizResultType, QuestionType, VocabSet } from '@/lib/types';
+import { speakText } from '@/lib/geminiService';
+import { getSetById } from '@/lib/api';
 import Spinner from './Spinner';
 
 const TOTAL_TIME = 90; // 90 seconds for the lightning round
@@ -50,11 +52,15 @@ function shuffleArray<T>(array: T[]): T[] { return [...array].sort(() => Math.ra
 const playTone = (frequency: number, duration: number, type: OscillatorType = 'sine') => { /* ... */ };
 
 
+
 const LightningQuizView: React.FC = () => {
   const { setId } = useParams<{ setId: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { questionTypes, questionCount } = (location.state as LocationState) || {};
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { questionTypes, questionCount } = { 
+    questionTypes: searchParams.get('types')?.split(',') as QuestionType[] || [],
+    questionCount: parseInt(searchParams.get('questionCount') || '10')
+  };
   
   const context = useContext(AppContext);
   const [quizSet, setQuizSet] = useState<VocabSet | null | undefined>(undefined);
@@ -163,8 +169,8 @@ const LightningQuizView: React.FC = () => {
     if (setId) {
         await saveQuizResult(setId, result);
     }
-    navigate(`/set/${setId}/result`, { state: { quizResult: result, quizType: 'lightning' } });
-  }, [isFinished, saveQuizResult, navigate, setId]);
+    router.push(`/set/${setId}/result`);
+  }, [isFinished, saveQuizResult, router, setId]);
 
 
   // Timer logic

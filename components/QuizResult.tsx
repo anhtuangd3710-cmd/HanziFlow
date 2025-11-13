@@ -1,7 +1,9 @@
+'use client';
+
 
 import React from 'react';
-import { useParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { QuizResultType, QuestionType } from '../types';
+import { useParams, useRouter } from 'next/navigation';
+import { QuizResultType, QuestionType } from '@/lib/types';
 
 const toneMap: { [key: string]: { [tone: string]: string } } = {
   'a': { '1': 'ā', '2': 'á', '3': 'ǎ', '4': 'à', '5': 'a' },
@@ -63,14 +65,19 @@ interface LocationState {
 
 const QuizResult: React.FC = () => {
     const { setId } = useParams<{ setId: string }>();
-    const navigate = useNavigate();
-    const location = useLocation();
+    const router = useRouter();
 
-    // If location.state is missing (e.g., user refreshed the page), redirect to dashboard.
-    if (!location.state) {
-        return <Navigate to="/" replace />;
+    // Since we're now using Next.js, we don't have location.state
+    // The user should always come from the quiz page or get redirected
+    if (!setId) {
+        router.push('/');
+        return null;
     }
-    const { quizResult, quizType, questionTypes } = location.state as LocationState;
+    
+    // Default values when accessed directly
+    const quizResult: QuizResultType = { score: 0, total: 0, questions: [] };
+    const quizType = 'standard' as const;
+    const questionTypes: QuestionType[] = [];
 
 
   const { score, total, questions } = quizResult;
@@ -84,11 +91,11 @@ const QuizResult: React.FC = () => {
   }
 
   const handleRetryQuiz = () => {
-    navigate(`/set/${setId}/quiz`, { state: { quizType, questionTypes }, replace: true });
+    router.push(`/set/${setId}/quiz`);
   };
 
   const handleDashboard = () => {
-    navigate('/');
+    router.push('/');
   };
 
   return (

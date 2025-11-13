@@ -1,6 +1,8 @@
+'use client';
+
 import React, { useState, useContext } from 'react';
-import { AppContext } from '../context/AppContext';
-import { VocabSet, VocabItem } from '../types';
+import { AppContext } from '@/context/AppContext';
+import { VocabSet, VocabItem } from '@/lib/types';
 import Spinner from './Spinner';
 import { BrainCircuitIcon } from './icons/BrainCircuitIcon';
 import { HelpCircleIcon } from './icons/HelpCircleIcon';

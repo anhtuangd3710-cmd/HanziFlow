@@ -1,8 +1,10 @@
+'use client';
+
 
 import React, { useContext, useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
-import { useDebounce } from '../hooks/useDebounce';
+import { useRouter } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
+import { useDebounce } from '@/hooks/useDebounce';
 import PublicSetCard from './PublicSetCard';
 import Spinner from './Spinner';
 import Pagination from './Pagination';
@@ -12,7 +14,7 @@ const CommunityView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const debouncedSearchTerm = useDebounce(searchTerm, 500); // 500ms delay
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const fetchSetsCallback = context?.fetchPublicSets;
 
@@ -72,7 +74,7 @@ const CommunityView: React.FC = () => {
               <PublicSetCard 
                   key={set._id} 
                   set={set} 
-                  onPreview={() => navigate(`/community/set/${set._id}`)}
+                  onPreview={() => router.push(`/community/set/${set._id}`)}
               />
             ))}
           </div>

@@ -1,9 +1,9 @@
 
 import React, { useContext, useEffect } from 'react';
-import { AppContext } from '../context/AppContext';
+import { AppContext } from '@/context/AppContext';
 import Spinner from './Spinner';
 import { TrophyIcon } from './icons/TrophyIcon';
-import { User } from '../types';
+import { User } from '@/lib/types';
 
 const formatJoinDate = (dateString?: string) => {
     if (!dateString) return 'N/A';

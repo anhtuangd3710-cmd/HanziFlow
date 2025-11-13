@@ -1,15 +1,17 @@
+'use client';
+
 
 import React, { useContext, useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
-import { getPublicSetDetails } from '../services/api';
-import { VocabSet } from '../types';
+import { useParams } from 'next/navigation'; import { useRouter } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
+import { getPublicSetDetails } from '@/lib/api';
+import { VocabSet } from '@/lib/types';
 import Spinner from './Spinner';
 import { DownloadIcon } from './icons/DownloadIcon';
 
 const PublicSetPreview: React.FC = () => {
   const { setId } = useParams<{ setId: string }>();
-  const navigate = useNavigate();
+  const router = useRouter();
   const context = useContext(AppContext);
   const [set, setSet] = useState<VocabSet | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,7 +43,7 @@ const PublicSetPreview: React.FC = () => {
     if (isAlreadyCloned || isOwnSet || !setId) return;
     const cloned = await cloneSet(setId);
     if (cloned) {
-      navigate('/');
+      router.push('/');
     }
   };
   
@@ -59,7 +61,7 @@ const PublicSetPreview: React.FC = () => {
       <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
         <h3 className="text-xl font-semibold text-red-600">Error</h3>
         <p className="text-gray-600 mt-2">{error || "The set could not be found."}</p>
-        <button onClick={() => navigate('/community')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        <button onClick={() => router.push('/community')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
           Back to Community
         </button>
       </div>
@@ -99,7 +101,7 @@ const PublicSetPreview: React.FC = () => {
             ))}
         </div>
       </div>
-       <button onClick={() => navigate('/community')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold">
+       <button onClick={() => router.push('/community')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold">
            ← Back to Community
        </button>
     </div>

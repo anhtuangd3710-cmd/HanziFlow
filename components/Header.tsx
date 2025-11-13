@@ -1,7 +1,10 @@
 
+
 import React, { useContext, useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
 import { FlameIcon } from './icons/FlameIcon';
 import { UsersIcon } from './icons/UsersIcon';
 import { UserCircleIcon } from './icons/UserCircleIcon';
@@ -12,6 +15,7 @@ import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
 
 const Header: React.FC = () => {
   const context = useContext(AppContext);
+  const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -21,6 +25,7 @@ const Header: React.FC = () => {
   const handleLogout = () => {
     setIsDropdownOpen(false);
     logout();
+    router.push('/login');
   };
   
   // Close dropdown on click outside
@@ -44,22 +49,29 @@ const Header: React.FC = () => {
     <header className="bg-white shadow-md sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <Link to="/" className="text-2xl font-bold text-blue-600">
-              HanziFlow
+          <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <Image 
+                src="/logo.png" 
+                alt="HanziFlow Logo" 
+                width={40} 
+                height={40}
+                className="rounded-lg"
+              />
+              <span className="text-xl font-bold text-blue-600 hidden sm:inline">HanziFlow</span>
             </Link>
           </div>
           {user && (
             <div className="flex items-center gap-4 sm:gap-6">
               <Link
-                to="/leaderboard"
+                href="/leaderboard"
                 className="flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors"
               >
                 <TrophyIcon size={20} />
                 <span className="hidden sm:inline">Leaderboard</span>
               </Link>
               <Link
-                to="/community"
+                href="/community"
                 className="flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors"
               >
                 <UsersIcon size={20} />
@@ -89,11 +101,11 @@ const Header: React.FC = () => {
                   </button>
                   {isDropdownOpen && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5">
-                          <Link to="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                          <Link href="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                               My Profile
                           </Link>
                           {user.role === 'admin' && (
-                              <Link to="/admin" onClick={() => setIsDropdownOpen(false)} className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                              <Link href="/admin" onClick={() => setIsDropdownOpen(false)} className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                 <ShieldCheckIcon size={16} className="mr-2" />
                                 Admin Panel
                               </Link>

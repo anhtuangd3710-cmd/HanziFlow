@@ -1,10 +1,13 @@
+'use client';
+
 
 import React, { useState, useContext, useMemo, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { AppContext } from '../context/AppContext';
-import { VocabItem, VocabSet } from '../types';
-import { speakText } from '../services/geminiService';
-import { getSetById } from '../services/api';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { AppContext } from '@/context/AppContext';
+import { VocabItem, VocabSet } from '@/lib/types';
+import { speakText } from '@/lib/geminiService';
+import { getSetById } from '@/lib/api';
 import { Volume2Icon } from './icons/Volume2Icon';
 import { StarIcon } from './icons/StarIcon';
 import Spinner from './Spinner';
@@ -17,11 +20,11 @@ interface LocationState {
 
 const FlashcardView: React.FC = () => {
   const { setId } = useParams<{ setId: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const context = useContext(AppContext);
   
-  const { studyMode } = (location.state as LocationState) || { studyMode: 'all' };
+  const { studyMode } = { studyMode: (searchParams.get('studyMode') as 'all' | 'review') || 'all' };
 
   const [studySet, setStudySet] = useState<VocabSet | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,7 +127,7 @@ const FlashcardView: React.FC = () => {
   const currentItem = sessionItems[currentIndex];
 
   if (isLoading) return <div className="flex justify-center mt-8"><Spinner /></div>;
-  if (!studySet) return <div>Set not found. <button onClick={() => navigate('/')}>Go back.</button></div>;
+  if (!studySet) return <div>Set not found. <button onClick={() => router.push('/')}>Go back.</button></div>;
   if (sessionItems.length === 0) {
       return (
         <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
@@ -135,7 +138,7 @@ const FlashcardView: React.FC = () => {
                     : "This set is currently empty."
                 }
             </p>
-            <button onClick={() => navigate('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button onClick={() => router.push('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 Back to Dashboard
             </button>
         </div>
@@ -148,7 +151,7 @@ const FlashcardView: React.FC = () => {
             <h3 className="text-2xl font-bold text-green-600">Session Complete!</h3>
             <p className="text-gray-600 mt-2">You've reviewed all the words for this session.</p>
             <div className="flex justify-center gap-4 mt-6">
-                <button onClick={() => navigate('/')} className="py-2 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
+                <button onClick={() => router.push('/')} className="py-2 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
                     Finish
                 </button>
                 <button onClick={() => { setCurrentIndex(0); setSessionItems([...sessionItems].sort(() => Math.random() - 0.5)) }} className="py-2 px-6 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
@@ -230,7 +233,7 @@ const FlashcardView: React.FC = () => {
         </div>
       )}
       
-       <button onClick={() => navigate('/')} className="mt-8 text-gray-600 hover:text-gray-800 font-semibold">
+       <button onClick={() => router.push('/')} className="mt-8 text-gray-600 hover:text-gray-800 font-semibold">
            ← Back to Dashboard
        </button>
         <style>{`

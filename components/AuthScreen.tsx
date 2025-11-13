@@ -1,6 +1,6 @@
 
 import React, { useState, useContext, useEffect, useCallback } from 'react';
-import { AppContext } from '../context/AppContext';
+import { AppContext } from '@/context/AppContext';
 import Spinner from './Spinner';
 import { MailIcon } from './icons/MailIcon';
 import { LockIcon } from './icons/LockIcon';
