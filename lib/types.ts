@@ -6,6 +6,7 @@ export interface User {
   token?: string; // Token is received on login
   createdAt?: string; // Added from backend timestamps
   role?: 'user' | 'admin';
+  message?: string; // For auth response messages
   // --- Gamification Fields ---
   xp: number;
   currentStreak: number;
@@ -13,6 +14,8 @@ export interface User {
   lastStudiedDate?: string;
   // --- Community Fields ---
   clonedSets?: string[]; // Array of original set IDs
+  sets?: VocabSet[]; // User's created vocab sets
+  communityScore?: number; // Score from community activities (shares, followers, etc)
 }
 
 export interface VocabItem {
@@ -108,7 +111,11 @@ export interface AdminStats {
   userCount: number;
   setCount: number;
 }
-export type AdminUser = Pick<User, '_id' | 'name' | 'email' | 'xp' | 'createdAt' | 'role'>;
+export type AdminUser = Pick<User, '_id' | 'name' | 'email' | 'xp' | 'createdAt' | 'role'> & {
+  isBlocked?: boolean;
+  blockReason?: string | null;
+  blockedAt?: string | null;
+};
 
 
 export interface AppState {

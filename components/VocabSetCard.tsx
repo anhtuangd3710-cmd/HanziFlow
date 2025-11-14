@@ -18,9 +18,10 @@ interface VocabSetCardProps {
   onProgress: (setId: string) => void;
   onEdit: (set: VocabSet) => void;
   onDelete: (setId: string) => void;
+  onStudyModes?: (setId: string) => void;
 }
 
-const VocabSetCard: React.FC<VocabSetCardProps> = ({ set, onStartSession, onReviewQuiz, onProgress, onEdit, onDelete }) => {
+const VocabSetCard: React.FC<VocabSetCardProps> = ({ set, onStartSession, onReviewQuiz, onProgress, onEdit, onDelete, onStudyModes }) => {
   const reviewItemsCount = set.items.filter(item => item.needsReview).length;
 
   const difficultyColors = {
@@ -47,9 +48,9 @@ const VocabSetCard: React.FC<VocabSetCardProps> = ({ set, onStartSession, onRevi
       </div>
       <div className="mt-6 flex flex-wrap gap-2 justify-end items-center">
         <button 
-            onClick={() => onStartSession(set)} 
-            className="flex items-center text-sm bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded-md transition duration-200">
-            <BookOpenIcon size={16} className="mr-1.5"/> Practice
+            onClick={() => onStudyModes ? onStudyModes(set._id) : onStartSession(set)} 
+            className="flex items-center text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-md transition duration-200">
+            <BookOpenIcon size={16} className="mr-1.5"/> Học
         </button>
 
         <button 
@@ -58,7 +59,7 @@ const VocabSetCard: React.FC<VocabSetCardProps> = ({ set, onStartSession, onRevi
             className="flex items-center text-sm bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-md transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
             title={reviewItemsCount < minWordsForQuiz ? `Need at least ${minWordsForQuiz} words for review (you have ${reviewItemsCount}).` : `Quiz ${reviewItemsCount} review words`}
         >
-            <StarIcon size={16} className="mr-1.5"/> Review
+            <StarIcon size={16} className="mr-1.5"/> Ôn
         </button>
         <button onClick={() => onProgress(set._id)} className="p-2 text-gray-500 hover:text-green-600 hover:bg-gray-100 rounded-full" title="View Progress">
             <ChartBarIcon size={20}/>

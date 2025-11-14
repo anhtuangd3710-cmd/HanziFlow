@@ -1,6 +1,9 @@
 import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser, AdminStats, AdminUser } from './types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? 'http://localhost:5001/api' 
+  : 'https://hanziflow-backend.onrender.com/api');
+
 // Custom error for auth failures
 export class AuthError extends Error {
   constructor(message: string) {
@@ -75,7 +78,7 @@ export const loginUser = async (email: string, password: string): Promise<User> 
     return await res.json();
 };
 
-export const registerUser = async (name: string, email: string, password: string): Promise<User> => {
+export const registerUser = async (name: string, email: string, password: string): Promise<{ message: string, email: string }> => {
     const res = await fetch(`${API_URL}/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,6 +120,34 @@ export const resetPassword = async (token: string, email: string, newPassword: s
     return await res.json();
 };
 
+export const verifyEmail = async (token: string, email: string): Promise<User> => {
+    const res = await fetch(`${API_URL}/users/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, email }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to verify email');
+    }
+    return await res.json();
+};
+
+export const googleAuth = async (googleId: string, name: string, email: string): Promise<User> => {
+    const res = await fetch(`${API_URL}/users/google-auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ googleId, name, email }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Google login failed');
+    }
+    return await res.json();
+};
+
 export const updateUserProfile = async (userData: { name: string }): Promise<User> => {
     return apiFetch(`${API_URL}/users/profile`, {
         method: 'PUT',
@@ -127,6 +158,7 @@ export const updateUserProfile = async (userData: { name: string }): Promise<Use
 
 // --- Vocab Sets ---
 export const getSets = async (page: number, limit: number): Promise<{ sets: VocabSet[], page: number, pages: number, total: number }> => {
+    
     return apiFetch(`${API_URL}/sets?page=${page}&limit=${limit}`);
 };
 
@@ -209,6 +241,19 @@ export const getAdminAllUsers = async (page: number, limit: number): Promise<{ u
 
 export const adminDeleteUser = async (userId: string): Promise<void> => {
     return apiFetch(`${API_URL}/admin/users/${userId}`, { method: 'DELETE' });
+};
+
+export const blockUser = async (userId: string, reason: string): Promise<{ message: string; user: AdminUser }> => {
+    return apiFetch(`${API_URL}/admin/users/${userId}/block`, {
+        method: 'PUT',
+        body: JSON.stringify({ reason }),
+    });
+};
+
+export const unblockUser = async (userId: string): Promise<{ message: string; user: AdminUser }> => {
+    return apiFetch(`${API_URL}/admin/users/${userId}/unblock`, {
+        method: 'PUT',
+    });
 };
 
 export const exportAllUsers = async (): Promise<AdminUser[]> => {

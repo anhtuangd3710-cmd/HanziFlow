@@ -16,6 +16,7 @@ import ProgressCard from './ProgressCard';
 import ReviewSessionModal from './ReviewSessionModal';
 import Pagination from './Pagination';
 import SessionSetupModal from './SessionSetupModal';
+import LevelingSystem from './LevelingSystem';
 
 const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -167,11 +168,14 @@ const Dashboard: React.FC = () => {
       <div className="lg:col-span-1">
         <div className="sticky top-24 space-y-8">
            {user && userStats && (
-              <ProgressCard 
-                user={user}
-                userStats={userStats}
-                onStartReview={handleOpenReviewModal}
-              />
+              <>
+                <LevelingSystem />
+                <ProgressCard 
+                  user={user}
+                  userStats={userStats}
+                  onStartReview={handleOpenReviewModal}
+                />
+              </>
            )}
 
           {/* Quiz History */}

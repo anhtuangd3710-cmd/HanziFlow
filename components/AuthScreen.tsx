@@ -1,6 +1,6 @@
-
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useGoogleLogin } from '@react-oauth/google';
 import { AppContext } from '@/context/AppContext';
 import Spinner from './Spinner';
 import { MailIcon } from './icons/MailIcon';
@@ -59,6 +59,7 @@ const InputField: React.FC<InputFieldProps> = ({ id, type, placeholder, value, o
 const AuthScreen: React.FC = () => {
   const context = useContext(AppContext);
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   
   // Form state
   const [name, setName] = useState('');
@@ -72,7 +73,42 @@ const AuthScreen: React.FC = () => {
   const [touched, setTouched] = useState({ name: false, email: false, password: false, confirmPassword: false });
 
   if (!context) return <div>Loading context...</div>;
-  const { login, register, state } = context;
+  const { login, register, state, googleSignIn } = context;
+
+  // Google Login Handler - only use if client_id is available
+  let googleLogin: any = null;
+  if (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+    try {
+      googleLogin = useGoogleLogin({
+        onSuccess: async (codeResponse) => {
+          setIsGoogleLoading(true);
+          try {
+            // Get user info from Google ID token
+            const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + codeResponse.access_token);
+            const googleUser = await response.json();
+            
+            // Call backend Google Auth
+            if (googleSignIn) {
+              await googleSignIn(codeResponse.access_token, googleUser.name || googleUser.email.split('@')[0], googleUser.email);
+            }
+          } catch (error) {
+            console.error('Google login failed:', error);
+            alert('Google login failed. Please try again.');
+          } finally {
+            setIsGoogleLoading(false);
+          }
+        },
+        onError: (error) => {
+          console.error('Google login error:', error);
+          alert('Google login failed. Please try again.');
+        },
+        flow: 'implicit',
+      });
+    } catch (error) {
+      console.error('Failed to initialize Google Login:', error);
+      googleLogin = null;
+    }
+  }
 
   // --- Validation Logic ---
   const validate = useCallback(() => {
@@ -238,6 +274,41 @@ const AuthScreen: React.FC = () => {
                 {state.isLoading ? <Spinner /> : (mode === 'login' ? 'Sign In' : 'Create Account')}
               </button>
             </div>
+
+            {/* Google Sign-In Button - Only show if client_id is configured */}
+            {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && googleLogin && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => googleLogin()}
+                  disabled={state.isLoading || isGoogleLoading}
+                  className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-500 bg-white hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGoogleLoading ? (
+                    <>
+                      <Spinner />
+                      <span className="ml-2">Signing in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M15.545 6.558a9.42 9.42 0 0 1 .139 1.626c0 2.449-.444 4.631-1.617 6.495A6.996 6.996 0 0 1 10 17c-3.87 0-7-3.13-7-7s3.13-7 7-7c1.865 0 3.567.811 4.753 2.105.504-.642 1.113-1.2 1.792-1.547A8.973 8.973 0 0 0 10 2C4.477 2 0 6.477 0 12s4.477 10 10 10c5.523 0 10-4.477 10-10 0-.396-.028-.788-.081-1.175a8.967 8.967 0 0 1-1.374 1.733z" />
+                      </svg>
+                      <span className="ml-2">Google</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </form>
           <p className="mt-2 text-center text-sm text-gray-600">
             {mode === 'login' ? "Don't have an account?" : "Already have an account?"}

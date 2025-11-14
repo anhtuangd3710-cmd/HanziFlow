@@ -146,13 +146,23 @@ const FlashcardView: React.FC = () => {
   }
 
   if (currentIndex >= sessionItems.length) {
+      const isMixedMode = searchParams.get('studyMode') === 'mixed';
+      
+      // Mark mode as completed in sessionStorage for MixedStudyMode to detect
+      if (isMixedMode) {
+        sessionStorage.setItem('mixedModeCompleted', 'true');
+      }
+      
       return (
         <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
             <h3 className="text-2xl font-bold text-green-600">Session Complete!</h3>
             <p className="text-gray-600 mt-2">You've reviewed all the words for this session.</p>
             <div className="flex justify-center gap-4 mt-6">
-                <button onClick={() => router.push('/')} className="py-2 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
-                    Finish
+                <button 
+                  onClick={() => isMixedMode ? window.history.back() : router.push('/')} 
+                  className="py-2 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300"
+                >
+                    {isMixedMode ? 'Back to Mixed Mode' : 'Finish'}
                 </button>
                 <button onClick={() => { setCurrentIndex(0); setSessionItems([...sessionItems].sort(() => Math.random() - 0.5)) }} className="py-2 px-6 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
                     Study Again

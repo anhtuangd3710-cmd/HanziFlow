@@ -84,9 +84,9 @@ const QuizView: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const quizType = (searchParams.get('quizType') as 'standard' | 'review') || 'standard';
-  const questionTypes = searchParams.get('types')?.split(',') as QuestionType[] || [];
-  const questionCount = parseInt(searchParams.get('questionCount') || '10');
+  const quizType = useMemo(() => (searchParams.get('quizType') as 'standard' | 'review') || 'standard', [searchParams]);
+  const questionTypes = useMemo(() => searchParams.get('types')?.split(',') as QuestionType[] || [], [searchParams]);
+  const questionCount = useMemo(() => parseInt(searchParams.get('questionCount') || '10'), [searchParams]);
   
   const context = useContext(AppContext);
   
@@ -252,7 +252,14 @@ const QuizView: React.FC = () => {
                     : ` This set only has ${itemsForQuiz.length} word${itemsForQuiz.length === 1 ? '' : 's'}.`
                 }
             </p>
-            <button onClick={() => router.push('/')} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <button onClick={() => {
+              if (searchParams.get('studyMode') === 'mixed') {
+                sessionStorage.setItem('mixedModeCompleted', 'true');
+                window.history.back();
+              } else {
+                router.push('/');
+              }
+            }} className="mt-6 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                 Back to Dashboard
             </button>
         </div>
@@ -335,7 +342,14 @@ const QuizView: React.FC = () => {
             {renderQuestionPrompt()}
         </div>
         {renderAnswerArea()}
-         <button onClick={() => router.push('/')} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold"> ← Quit Quiz </button>
+         <button onClick={() => {
+          if (searchParams.get('studyMode') === 'mixed') {
+            sessionStorage.setItem('mixedModeCompleted', 'true');
+            window.history.back();
+          } else {
+            router.push('/');
+          }
+        }} className="mt-8 block mx-auto text-gray-600 hover:text-gray-800 font-semibold"> ← Quit Quiz </button>
     </div>
   );
 };

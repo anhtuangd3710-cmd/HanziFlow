@@ -19,16 +19,7 @@ const Header: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  if (!context) return null;
-  const { state, logout } = context;
-
-  const handleLogout = () => {
-    setIsDropdownOpen(false);
-    logout();
-    router.push('/login');
-  };
-  
-  // Close dropdown on click outside
+  // Hydration and close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -38,6 +29,15 @@ const Header: React.FC = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownRef]);
+
+  if (!context) return null;
+  const { state, logout } = context;
+
+  const handleLogout = () => {
+    logout();
+    setIsDropdownOpen(false);
+    router.push('/login');
+  };
 
   const user = state.user;
   const level = user ? Math.floor(user.xp / 100) + 1 : 1;
@@ -62,42 +62,42 @@ const Header: React.FC = () => {
             </Link>
           </div>
           {user && (
-            <div className="flex items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
               <Link
                 href="/leaderboard"
-                className="flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors"
+                className="hidden sm:flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors text-sm"
               >
-                <TrophyIcon size={20} />
-                <span className="hidden sm:inline">Leaderboard</span>
+                <TrophyIcon size={18} />
+                <span className="hidden lg:inline">Leaderboard</span>
               </Link>
               <Link
                 href="/community"
-                className="flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors"
+                className="hidden sm:flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors text-sm"
               >
-                <UsersIcon size={20} />
-                <span className="hidden sm:inline">Community</span>
+                <UsersIcon size={18} />
+                <span className="hidden lg:inline">Community</span>
               </Link>
 
-              <div className="flex items-center gap-2">
-                 <FlameIcon className="h-6 w-6 text-orange-500" />
-                 <span className="font-bold text-lg text-gray-700">{user.currentStreak}</span>
+              <div className="flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-lg">
+                 <FlameIcon className="h-5 w-5 text-orange-500" />
+                 <span className="font-bold text-sm text-gray-700">{user.currentStreak}</span>
               </div>
               
-              <div className="hidden md:block w-40">
-                  <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-sm font-bold text-gray-700">Level {level}</span>
-                      <span className="text-xs text-gray-500">{currentLevelXp} / {xpForNextLevel} XP</span>
+              <div className="hidden lg:block w-32">
+                  <div className="flex justify-between items-baseline mb-0.5">
+                      <span className="text-xs font-bold text-gray-700">L{level}</span>
+                      <span className="text-xs text-gray-500">{currentLevelXp}/{xpForNextLevel}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div className="bg-blue-600 h-2.5 rounded-full" style={{width: `${progressPercentage}%`}}></div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div className="bg-blue-600 h-1.5 rounded-full" style={{width: `${progressPercentage}%`}}></div>
                   </div>
               </div>
 
               <div className="relative" ref={dropdownRef}>
-                  <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-2 p-1 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                      <UserCircleIcon size={32} className="text-gray-600" />
-                      <span className="hidden lg:inline font-semibold text-gray-800">{user.name}</span>
-                      <ChevronDownIcon size={20} className={`text-gray-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-1 p-1 rounded-full hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                      <UserCircleIcon size={28} className="text-gray-600" />
+                      <span className="hidden sm:inline font-semibold text-gray-800 text-sm">{user.name.split(' ')[0]}</span>
+                      <ChevronDownIcon size={16} className={`text-gray-500 transition-transform hidden sm:inline ${isDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {isDropdownOpen && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 ring-1 ring-black ring-opacity-5">

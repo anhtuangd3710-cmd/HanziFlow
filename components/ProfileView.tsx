@@ -9,6 +9,8 @@ import { BookOpenIcon } from './icons/BookOpenIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import Spinner from './Spinner';
 import EditProfileModal from './EditProfileModal';
+import BadgeShowcase from './BadgeShowcase';
+import StreakAndAchievements from './StreakAndAchievements';
 import { QuizHistory } from '@/lib/types';
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number }> = ({ icon, label, value }) => (
@@ -90,6 +92,12 @@ const ProfileView: React.FC = () => {
                  <StatCard icon={<ClipboardListIcon className="text-blue-500" />} label="Sets Created" value={setsPagination?.totalSets || 0} />
                  <StatCard icon={<BookOpenIcon className="text-green-500" />} label="Words Learned" value={userStats?.mastery.total || 0} />
             </div>
+
+            {/* Streak and Achievements Section */}
+            <StreakAndAchievements />
+
+            {/* Badges Section */}
+            <BadgeShowcase />
 
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Full Quiz History</h2>

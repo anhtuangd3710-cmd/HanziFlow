@@ -57,10 +57,8 @@ const LightningQuizView: React.FC = () => {
   const { setId } = useParams<{ setId: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { questionTypes, questionCount } = { 
-    questionTypes: searchParams.get('types')?.split(',') as QuestionType[] || [],
-    questionCount: parseInt(searchParams.get('questionCount') || '10')
-  };
+  const questionTypes = useMemo(() => searchParams.get('types')?.split(',') as QuestionType[] || [], [searchParams]);
+  const questionCount = useMemo(() => parseInt(searchParams.get('questionCount') || '10'), [searchParams]);
   
   const context = useContext(AppContext);
   const [quizSet, setQuizSet] = useState<VocabSet | null | undefined>(undefined);
@@ -169,7 +167,13 @@ const LightningQuizView: React.FC = () => {
     if (setId) {
         await saveQuizResult(setId, result);
     }
-    router.push(`/set/${setId}/result`);
+    
+    if (searchParams.get('studyMode') === 'mixed') {
+        sessionStorage.setItem('mixedModeCompleted', 'true');
+        window.history.back();
+    } else {
+        router.push(`/set/${setId}/result`);
+    }
   }, [isFinished, saveQuizResult, router, setId]);
 
 

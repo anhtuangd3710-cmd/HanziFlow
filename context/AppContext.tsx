@@ -98,8 +98,9 @@ interface AppContextType {
     state: AppState;
     login: (email: string, password: string, rememberMe: boolean) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
+    googleSignIn: (accessToken: string, name: string, email: string) => Promise<void>;
     logout: () => void;
-    fetchSets: (page: number) => Promise<void>;
+    fetchSets: (page: number) => Promise<{ sets: VocabSet[]; page: number; pages: number; total: number; } | undefined>;
     saveSet: (set: Partial<Omit<VocabSet, '_id' | 'user'>> & { _id?: string }) => Promise<VocabSet | undefined>;
     deleteSet: (setId: string) => Promise<void>;
     saveQuizResult: (setId: string, result: QuizResultType) => Promise<void>;
@@ -116,6 +117,8 @@ interface AppContextType {
     fetchAdminStats: () => Promise<void>;
     fetchAdminUsers: (page: number) => Promise<void>;
     adminDeleteUser: (userId: string) => Promise<void>;
+    adminBlockUser: (userId: string, reason: string) => Promise<void>;
+    adminUnblockUser: (userId: string) => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -178,13 +181,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const register = async (name: string, email: string, password: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const userWithToken = await api.registerUser(name, email, password);
-            // Default to session storage on register, user can re-login with "remember me"
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userWithToken));
-            dispatch({ type: 'LOGIN', payload: userWithToken });
+            const response = await api.registerUser(name, email, password);
+            // Show verification message and redirect to verify email page
+            alert(`${response.message}\n\nA verification link has been sent to ${response.email}`);
+            // Redirect to verify email page (user will click link in email)
+            window.location.href = '/login';
         } catch (error) {
             console.error(error);
             alert((error as Error).message || "Registration failed. Please try again.");
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    };
+
+    const googleSignIn = async (accessToken: string, name: string, email: string) => {
+        dispatch({ type: 'SET_LOADING', payload: true });
+        try {
+            // Decode Google ID token to get user ID
+            // For simplicity, we'll use email as unique identifier
+            const response = await api.googleAuth(email, name, email);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(response));
+            dispatch({ type: 'LOGIN', payload: response });
+        } catch (error) {
+            console.error(error);
+            alert((error as Error).message || "Google login failed. Please try again.");
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     };
@@ -193,14 +212,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         localStorage.removeItem(STORAGE_KEY);
         sessionStorage.removeItem(STORAGE_KEY);
         dispatch({ type: 'LOGOUT' });
+        // Redirect to login page
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
     }, []);
 
     const fetchSets = useCallback(async (page: number) => {
         if (!state.user?.token) return;
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            const data = await api.getSets(page, 6);
+            const data = await api.getSets(page, 10);
             dispatch({ type: 'SETS_LOADED', payload: data });
+            return data;
         } catch(error) {
             console.error("Failed to fetch sets:", error);
             if (error instanceof AuthError) {
@@ -537,6 +561,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     }, [state.user?.role, fetchAdminUsers, state.adminUsersPagination?.currentPage]);
 
+    const adminBlockUser = useCallback(async (userId: string, reason: string) => {
+        if (state.user?.role !== 'admin') return;
+        try {
+            await api.blockUser(userId, reason);
+        } catch(error) {
+            console.error("Failed to block user:", error);
+            throw error;
+        }
+    }, [state.user?.role]);
+
+    const adminUnblockUser = useCallback(async (userId: string) => {
+        if (state.user?.role !== 'admin') return;
+        try {
+            await api.unblockUser(userId);
+        } catch(error) {
+            console.error("Failed to unblock user:", error);
+            throw error;
+        }
+    }, [state.user?.role]);
+
 
     useEffect(() => {
         if (state.user) {
@@ -547,7 +591,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
   return (
-    <AppContext.Provider value={{ state, login, register, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal, fetchProfileHistory, updateUserProfile, fetchLeaderboard, fetchAdminStats, fetchAdminUsers, adminDeleteUser }}>
+    <AppContext.Provider value={{ state, login, register, googleSignIn, logout, fetchSets, saveSet, deleteSet, saveQuizResult, toggleNeedsReview, generateSetWithAI, generateExample, fetchPublicSets, cloneSet, closeApiKeyModal, fetchProfileHistory, updateUserProfile, fetchLeaderboard, fetchAdminStats, fetchAdminUsers, adminDeleteUser, adminBlockUser, adminUnblockUser }}>
       {children}
     </AppContext.Provider>
   );

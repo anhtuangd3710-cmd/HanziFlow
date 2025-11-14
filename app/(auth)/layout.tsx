@@ -2,11 +2,10 @@
 
 import React, { useContext, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import { AppContext } from '@/context/AppContext';
 import Spinner from '@/components/Spinner';
 
-export default function AppLayout({
+export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -18,15 +17,14 @@ export default function AppLayout({
     // If context is not ready yet, wait
     if (!context) return;
     
-    // If user is not logged in, redirect to login
-    if (!context.state.isHydrated) return; // Wait for hydration
-    if (!context.state.user) {
-      router.push('/login');
+    // If user is already logged in, redirect to home
+    if (context.state.isHydrated && context.state.user) {
+      router.push('/');
     }
   }, [context, router]);
 
   // Show loading spinner while checking auth
-  if (!context || !context.state.isHydrated || !context.state.user) {
+  if (!context || !context.state.isHydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner />
@@ -34,12 +32,14 @@ export default function AppLayout({
     );
   }
 
-  return (
-    <>
-      <Header />
-      <main className="min-h-screen bg-gray-50 pt-5 pb-10">
-        {children}
-      </main>
-    </>
-  );
+  // If user is logged in, show loading while redirecting
+  if (context.state.user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }
