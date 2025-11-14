@@ -89,6 +89,34 @@ export const registerUser = async (name: string, email: string, password: string
     return await res.json();
 };
 
+export const forgotPassword = async (email: string): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/users/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to send reset email');
+    }
+    return await res.json();
+};
+
+export const resetPassword = async (token: string, email: string, newPassword: string): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/users/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, email, newPassword }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to reset password');
+    }
+    return await res.json();
+};
+
 export const updateUserProfile = async (userData: { name: string }): Promise<User> => {
     return apiFetch(`${API_URL}/users/profile`, {
         method: 'PUT',
