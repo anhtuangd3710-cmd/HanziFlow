@@ -259,3 +259,60 @@ export const unblockUser = async (userId: string): Promise<{ message: string; us
 export const exportAllUsers = async (): Promise<AdminUser[]> => {
     return apiFetch(`${API_URL}/admin/export/users`);
 };
+
+// Audio API methods
+export const createAudioFolder = async (name: string): Promise<{ success: boolean; data: any }> => {
+    return apiFetch(`${API_URL}/audio/folders`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+    });
+};
+
+export const getAudioFolders = async (): Promise<{ success: boolean; data: any[] }> => {
+    return apiFetch(`${API_URL}/audio/folders`);
+};
+
+export const deleteAudioFolder = async (folderId: string): Promise<{ success: boolean; message: string }> => {
+    return apiFetch(`${API_URL}/audio/folders/${folderId}`, {
+        method: 'DELETE',
+    });
+};
+
+export const uploadAudioFile = async (
+    folderId: string,
+    name: string,
+    audioData: string,
+    duration: number,
+    size: number,
+    mimeType?: string
+): Promise<{ success: boolean; data: any }> => {
+    return apiFetch(`${API_URL}/audio/files`, {
+        method: 'POST',
+        body: JSON.stringify({ folderId, name, audioData, duration, size, mimeType }),
+    });
+};
+
+export const getAudioFiles = async (folderId: string): Promise<{ success: boolean; data: any[] }> => {
+    return apiFetch(`${API_URL}/audio/files/${folderId}`);
+};
+
+export const getAudioFile = async (fileId: string): Promise<{ success: boolean; data: any }> => {
+    return apiFetch(`${API_URL}/audio/file/${fileId}`);
+};
+
+// Get Cloudinary URL for audio playback
+export const getAudioStreamUrl = (fileId: string): string => {
+    // This is now handled by the backend which returns cloudinaryUrl directly
+    // We'll fetch the URL from the database
+    return `${API_URL}/audio/stream/${fileId}`;
+};
+
+export const deleteAudioFile = async (fileId: string): Promise<{ success: boolean; message: string }> => {
+    return apiFetch(`${API_URL}/audio/files/${fileId}`, {
+        method: 'DELETE',
+    });
+};
+
+export const getAllAudioFiles = async (): Promise<{ success: boolean; data: any[] }> => {
+    return apiFetch(`${API_URL}/audio/all/files`);
+};

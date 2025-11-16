@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppProvider } from "@/context/AppContext";
+import { AudioProvider } from "@/context/AudioContext";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import "./globals.css";
 
@@ -56,13 +57,20 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         {googleClientId ? (
           <GoogleOAuthProvider clientId={googleClientId}>
-            <AppProvider>{children}</AppProvider>
+            <AppProvider>
+              <AudioProvider>
+                {children}
+              </AudioProvider>
+            </AppProvider>
           </GoogleOAuthProvider>
         ) : (
-          <AppProvider>{children}</AppProvider>
+          <AppProvider>
+            <AudioProvider>
+              {children}
+            </AudioProvider>
+          </AppProvider>
         )}
       </body>
     </html>
   );
 }
-

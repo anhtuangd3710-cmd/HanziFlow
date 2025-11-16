@@ -3,6 +3,7 @@
 import React, { useContext, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import AudioPlayer from '@/components/AudioPlayer';
 import { AppContext } from '@/context/AppContext';
 import Spinner from '@/components/Spinner';
 
@@ -40,6 +41,7 @@ export default function AppLayout({
       <main className="min-h-screen bg-gray-50 pt-5 pb-10">
         {children}
       </main>
+      <AudioPlayer />
     </>
   );
 }

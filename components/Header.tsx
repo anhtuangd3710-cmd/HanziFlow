@@ -11,6 +11,7 @@ import { UserCircleIcon } from './icons/UserCircleIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { TrophyIcon } from './icons/TrophyIcon';
 import { ShieldCheckIcon } from './icons/ShieldCheckIcon';
+import { MusicIcon } from './icons/MusicIcon';
 
 
 const Header: React.FC = () => {
@@ -76,6 +77,13 @@ const Header: React.FC = () => {
               >
                 <UsersIcon size={18} />
                 <span className="hidden lg:inline">Community</span>
+              </Link>
+              <Link
+                href="/audio"
+                className="hidden sm:flex items-center gap-2 py-2 px-3 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-semibold transition-colors text-sm"
+              >
+                <MusicIcon size={18} />
+                <span className="hidden lg:inline">Audio</span>
               </Link>
 
               <div className="flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-lg">
