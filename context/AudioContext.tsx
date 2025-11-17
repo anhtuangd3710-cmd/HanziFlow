@@ -163,6 +163,12 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Load folders from backend on mount (not localStorage!)
   useEffect(() => {
     const loadInitialFolders = async () => {
+      // Check if user is logged in before making API call
+      const storedUser = localStorage.getItem('hanziflow_user') || sessionStorage.getItem('hanziflow_user');
+      if (!storedUser) {
+        return; // Don't try to load if not logged in
+      }
+
       try {
         const response = await audioApi.getAudioFolders();
         if (response.success) {
@@ -268,6 +274,7 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           continue; // Skip non-audio files
         }
 
+        // Get duration using Audio element
         const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -277,37 +284,32 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
 
         const audio = new Audio(dataUrl);
-        
-        await new Promise((resolve) => {
-          const handleLoadedMetadata = () => {
-            // Upload to backend
-            audioApi.uploadAudioFile(folderId, file.name, dataUrl, audio.duration, file.size, file.type)
-              .then(response => {
-                if (response.success) {
-                  const backendFile = response.data;
-                  // Use Cloudinary URL directly from backend response
-                  const audioFile: AudioFile = {
-                    id: backendFile._id,
-                    name: backendFile.name,
-                    url: backendFile.cloudinaryUrl,  // Use Cloudinary URL directly
-                    duration: backendFile.duration,
-                    folderId,
-                    uploadedAt: backendFile.uploadedAt,
-                    size: backendFile.size,
-                  };
-                  dispatch({ type: 'ADD_AUDIO_FILE', payload: audioFile });
-                }
-              })
-              .catch(error => {
-                console.error('Failed to upload audio file:', error);
-              })
-              .finally(() => {
-                audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-                resolve(null);
-              });
-          };
-          audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        const duration = await new Promise<number>((resolve) => {
+          audio.addEventListener('loadedmetadata', () => {
+            resolve(audio.duration);
+          });
         });
+
+        // Upload file using FormData
+        try {
+          const response = await audioApi.uploadAudioFile(folderId, file, duration);
+          
+          if (response.success) {
+            const backendFile = response.data;
+            const audioFile: AudioFile = {
+              id: backendFile._id,
+              name: backendFile.name,
+              url: backendFile.cloudinaryUrl,
+              duration: backendFile.duration,
+              folderId,
+              uploadedAt: backendFile.uploadedAt,
+              size: backendFile.size,
+            };
+            dispatch({ type: 'ADD_AUDIO_FILE', payload: audioFile });
+          }
+        } catch (error) {
+          console.error('Failed to upload audio file:', error);
+        }
       }
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
@@ -358,6 +360,7 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
           continue; // Skip non-audio files
         }
 
+        // Get duration using Audio element
         const dataUrl = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
@@ -367,37 +370,32 @@ export const AudioProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         });
 
         const audio = new Audio(dataUrl);
-        
-        await new Promise((resolve) => {
-          const handleLoadedMetadata = () => {
-            // Upload to backend
-            audioApi.uploadAudioFile(newFolder.id, file.name, dataUrl, audio.duration, file.size, file.type)
-              .then(response => {
-                if (response.success) {
-                  const backendFile = response.data;
-                  // Use Cloudinary URL directly from backend response
-                  const audioFile: AudioFile = {
-                    id: backendFile._id,
-                    name: backendFile.name,
-                    url: backendFile.cloudinaryUrl,  // Use Cloudinary URL directly
-                    duration: backendFile.duration,
-                    folderId: newFolder.id,
-                    uploadedAt: backendFile.uploadedAt,
-                    size: backendFile.size,
-                  };
-                  dispatch({ type: 'ADD_AUDIO_FILE', payload: audioFile });
-                }
-              })
-              .catch(error => {
-                console.error('Failed to upload audio file:', error);
-              })
-              .finally(() => {
-                audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-                resolve(null);
-              });
-          };
-          audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+        const duration = await new Promise<number>((resolve) => {
+          audio.addEventListener('loadedmetadata', () => {
+            resolve(audio.duration);
+          });
         });
+
+        // Upload file using FormData
+        try {
+          const response = await audioApi.uploadAudioFile(newFolder.id, file, duration);
+          
+          if (response.success) {
+            const backendFile = response.data;
+            const audioFile: AudioFile = {
+              id: backendFile._id,
+              name: backendFile.name,
+              url: backendFile.cloudinaryUrl,
+              duration: backendFile.duration,
+              folderId: newFolder.id,
+              uploadedAt: backendFile.uploadedAt,
+              size: backendFile.size,
+            };
+            dispatch({ type: 'ADD_AUDIO_FILE', payload: audioFile });
+          }
+        } catch (error) {
+          console.error('Failed to upload audio file:', error);
+        }
       }
 
       return newFolder;

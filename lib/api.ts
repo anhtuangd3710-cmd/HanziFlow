@@ -277,16 +277,33 @@ export const deleteAudioFolder = async (folderId: string): Promise<{ success: bo
 
 export const uploadAudioFile = async (
     folderId: string,
-    name: string,
-    audioData: string,
-    duration: number,
-    size: number,
-    mimeType?: string
+    file: File,
+    duration: number
 ): Promise<{ success: boolean; data: any }> => {
-    return apiFetch(`${API_URL}/audio/files`, {
+    const formData = new FormData();
+    formData.append('audioFile', file);
+    formData.append('folderId', folderId);
+    formData.append('duration', duration.toString());
+
+    const token = getToken();
+    if (!token) {
+        throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_URL}/audio/files`, {
         method: 'POST',
-        body: JSON.stringify({ folderId, name, audioData, duration, size, mimeType }),
+        headers: {
+            'Authorization': `Bearer ${token}`,
+        },
+        body: formData, // Don't set Content-Type, browser will set it with boundary
     });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+    }
+
+    return response.json();
 };
 
 export const getAudioFiles = async (folderId: string): Promise<{ success: boolean; data: any[] }> => {
