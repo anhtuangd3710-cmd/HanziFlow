@@ -24,6 +24,7 @@ const MODE_INFO: Record<StudyMode, { name: string; icon: string }> = {
 const MixedStudyMode: React.FC = () => {
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
   const [completedModes, setCompletedModes] = useState<StudyMode[]>([]);
+  const [canProceed, setCanProceed] = useState(false);
   const params = useParams<{ setId: string }>();
   const router = useRouter();
   const context = useContext(AppContext);
@@ -44,14 +45,18 @@ const MixedStudyMode: React.FC = () => {
         // Mark current mode as completed
         if (!completedModes.includes(currentMode)) {
           setCompletedModes(prev => [...prev, currentMode]);
+          setCanProceed(true); // Cho phép chuyển sang giai đoạn tiếp theo
         }
         
-        // Auto advance to next mode
-        if (currentModeIndex < MODES_ORDER.length - 1) {
-          setCurrentModeIndex(prev => prev + 1);
-        } else {
-          setCurrentModeIndex(MODES_ORDER.length);
-        }
+        // Auto advance to next mode after 2 seconds
+        setTimeout(() => {
+          if (currentModeIndex < MODES_ORDER.length - 1) {
+            setCurrentModeIndex(prev => prev + 1);
+            setCanProceed(false); // Reset trạng thái cho giai đoạn mới
+          } else {
+            setCurrentModeIndex(MODES_ORDER.length);
+          }
+        }, 2000);
       }
     };
 
@@ -59,13 +64,17 @@ const MixedStudyMode: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentModeIndex, completedModes, currentMode]);
 
-  const handleModeSkip = () => {
-    if (!completedModes.includes(currentMode)) {
-      setCompletedModes(prev => [...prev, currentMode]);
-    }
+  // Reset canProceed when mode changes
+  useEffect(() => {
+    setCanProceed(false);
+  }, [currentModeIndex]);
+
+  const handleNextMode = () => {
+    if (!canProceed) return; // Không cho phép nếu chưa hoàn thành
     
     if (currentModeIndex < MODES_ORDER.length - 1) {
       setCurrentModeIndex(prev => prev + 1);
+      setCanProceed(false); // Reset trạng thái cho giai đoạn mới
     } else {
       setCurrentModeIndex(MODES_ORDER.length);
     }
@@ -148,17 +157,26 @@ const MixedStudyMode: React.FC = () => {
 
       {/* Current Study Mode */}
       <div className="relative">
-        {/* Skip button */}
-        <div className="absolute top-6 right-6 z-20">
-          {currentModeIndex < MODES_ORDER.length - 1 && (
+        {/* Next button - only shown when mode is completed */}
+        {canProceed && currentModeIndex < MODES_ORDER.length && (
+          <div className="fixed bottom-8 right-8 z-50">
             <button
-              onClick={handleModeSkip}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-semibold py-2 px-4 rounded-lg transition-colors"
+              onClick={handleNextMode}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-8 rounded-full shadow-2xl transition-all transform hover:scale-105 flex items-center gap-3"
             >
-              Bỏ Qua & Tiếp Tục
+              <span className="text-xl">✓</span>
+              <span>Tiếp Theo</span>
+              <span className="text-xl">→</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Completion notification */}
+        {canProceed && (
+          <div className="fixed top-24 right-8 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-bounce">
+            <p className="font-semibold">🎉 Hoàn thành! Tự động chuyển sau 2 giây...</p>
+          </div>
+        )}
 
         {currentMode === 'flashcard' && <FlashcardView />}
         {currentMode === 'matching' && <MatchingGame />}

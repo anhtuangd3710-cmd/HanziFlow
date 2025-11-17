@@ -178,28 +178,35 @@ const Dashboard: React.FC = () => {
               </>
            )}
 
-          {/* Quiz History */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Recent Quiz History</h3>
-              {state.quizHistory.length === 0 ? (
-                  <p className="text-gray-500 text-sm">You haven't completed any quizzes yet. Take a quiz to see your history here!</p>
-              ) : (
-                  <ul className="space-y-4">
-                      {state.quizHistory.slice(0, 3).map(history => {
-                          const percentage = history.total > 0 ? Math.round((history.score / history.total) * 100) : 0;
-                          return (
-                              <li key={history._id} className="p-3 bg-gray-50 rounded-md border border-gray-200">
-                                  <p className="font-semibold text-gray-700">{history.vocabSet.title}</p>
-                                  <div className="flex justify-between items-center text-sm mt-1">
-                                      <p className="font-bold text-blue-600">{history.score}/{history.total} ({percentage}%)</p>
-                                      <p className="text-gray-500">{formatRelativeTime(history.createdAt)}</p>
-                                  </div>
-                              </li>
-                          )
-                      })}
-                  </ul>
-              )}
-          </div>
+          {/* Quiz History - Compact Version */}
+          {state.quizHistory.length > 0 && (
+            <div className="bg-white rounded-lg shadow-lg p-5">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xl font-bold text-gray-800">Recent Quizzes</h3>
+                  <button
+                    onClick={() => router.push('/profile')}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                  >
+                    View All →
+                  </button>
+                </div>
+                <ul className="space-y-3">
+                    {state.quizHistory.slice(0, 2).map(history => {
+                        const percentage = history.total > 0 ? Math.round((history.score / history.total) * 100) : 0;
+                        const scoreColor = percentage >= 80 ? 'text-green-600' : percentage >= 60 ? 'text-blue-600' : 'text-orange-600';
+                        return (
+                            <li key={history._id} className="p-2.5 bg-gray-50 rounded-md border border-gray-200 hover:border-blue-300 transition-colors">
+                                <p className="font-semibold text-gray-700 text-sm truncate">{history.vocabSet.title}</p>
+                                <div className="flex justify-between items-center text-xs mt-1">
+                                    <p className={`font-bold ${scoreColor}`}>{percentage}% ({history.score}/{history.total})</p>
+                                    <p className="text-gray-500">{formatRelativeTime(history.createdAt)}</p>
+                                </div>
+                            </li>
+                        )
+                    })}
+                </ul>
+            </div>
+          )}
         </div>
       </div>
       

@@ -12,6 +12,7 @@ import EditProfileModal from './EditProfileModal';
 import BadgeShowcase from './BadgeShowcase';
 import StreakAndAchievements from './StreakAndAchievements';
 import { QuizHistory } from '@/lib/types';
+import { saveApiKey, getApiKey, deleteApiKey } from '@/lib/api';
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number }> = ({ icon, label, value }) => (
     <div className="bg-gray-50 p-4 rounded-lg flex items-center">
@@ -53,12 +54,72 @@ const formatRelativeTime = (dateString: string) => {
 const ProfileView: React.FC = () => {
     const context = useContext(AppContext);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [apiKey, setApiKey] = useState('');
+    const [showApiKey, setShowApiKey] = useState(false);
+    const [apiKeySaved, setApiKeySaved] = useState(false);
+    const [isLoadingApiKey, setIsLoadingApiKey] = useState(true);
+    const [isSavingApiKey, setIsSavingApiKey] = useState(false);
 
     useEffect(() => {
         if (context && !context.state.profileQuizHistory) {
             context.fetchProfileHistory();
         }
+        // Load existing API key from backend
+        loadApiKey();
     }, [context]);
+
+    const loadApiKey = async () => {
+        try {
+            setIsLoadingApiKey(true);
+            const response = await getApiKey();
+            if (response.apiKey) {
+                setApiKey(response.apiKey);
+                setApiKeySaved(true);
+            }
+        } catch (error) {
+            console.error('Error loading API key:', error);
+        } finally {
+            setIsLoadingApiKey(false);
+        }
+    };
+
+    const handleSaveApiKey = async () => {
+        if (!apiKey.trim()) {
+            alert('⚠️ Vui lòng nhập API Key!');
+            return;
+        }
+
+        try {
+            setIsSavingApiKey(true);
+            await saveApiKey(apiKey.trim());
+            setApiKeySaved(true);
+            alert('✅ API Key đã được lưu thành công!');
+        } catch (error: any) {
+            console.error('Error saving API key:', error);
+            alert(`❌ Lỗi: ${error.message || 'Không thể lưu API Key'}`);
+        } finally {
+            setIsSavingApiKey(false);
+        }
+    };
+
+    const handleRemoveApiKey = async () => {
+        if (!confirm('Bạn có chắc muốn xóa API Key?')) {
+            return;
+        }
+
+        try {
+            setIsSavingApiKey(true);
+            await deleteApiKey();
+            setApiKey('');
+            setApiKeySaved(false);
+            alert('🗑️ API Key đã được xóa!');
+        } catch (error: any) {
+            console.error('Error deleting API key:', error);
+            alert(`❌ Lỗi: ${error.message || 'Không thể xóa API Key'}`);
+        } finally {
+            setIsSavingApiKey(false);
+        }
+    };
 
     if (!context) return <Spinner />;
     const { state } = context;
@@ -98,6 +159,142 @@ const ProfileView: React.FC = () => {
 
             {/* Badges Section */}
             <BadgeShowcase />
+
+            {/* API Key Configuration Section */}
+            <div className="bg-gradient-to-br from-purple-50 to-blue-50 p-6 rounded-lg shadow-md border-2 border-purple-200">
+                <div className="flex items-center gap-3 mb-4">
+                    <span className="text-3xl">🤖</span>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800">Gemini API Configuration</h2>
+                        <p className="text-sm text-gray-600">Thiết lập API Key để sử dụng các tính năng AI</p>
+                    </div>
+                </div>
+
+                {/* API Status */}
+                {isLoadingApiKey ? (
+                    <div className="mb-4 p-3 rounded-lg bg-gray-100 border border-gray-300 flex items-center gap-2">
+                        <Spinner />
+                        <p className="text-sm text-gray-600">Đang tải thông tin API Key...</p>
+                    </div>
+                ) : (
+                    <div className={`mb-4 p-3 rounded-lg ${apiKeySaved ? 'bg-green-100 border border-green-300' : 'bg-yellow-100 border border-yellow-300'}`}>
+                        <p className="text-sm font-semibold">
+                            {apiKeySaved ? '✅ API Key đã được cài đặt' : '⚠️ Chưa có API Key - Đang dùng API miễn phí (có giới hạn)'}
+                        </p>
+                    </div>
+                )}
+
+                {/* API Key Input */}
+                <div className="mb-4">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Gemini API Key:
+                    </label>
+                    <div className="flex gap-2">
+                        <input
+                            type={showApiKey ? 'text' : 'password'}
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="Nhập API Key của bạn..."
+                            disabled={isLoadingApiKey || isSavingApiKey}
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        />
+                        <button
+                            onClick={() => setShowApiKey(!showApiKey)}
+                            disabled={isLoadingApiKey || isSavingApiKey}
+                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={showApiKey ? 'Ẩn' : 'Hiện'}
+                        >
+                            {showApiKey ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 mb-4">
+                    <button
+                        onClick={handleSaveApiKey}
+                        disabled={!apiKey.trim() || isLoadingApiKey || isSavingApiKey}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold py-2 px-4 rounded-lg transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        {isSavingApiKey ? (
+                            <>
+                                <Spinner />
+                                <span>Đang lưu...</span>
+                            </>
+                        ) : (
+                            <>💾 Lưu API Key</>
+                        )}
+                    </button>
+                    {apiKeySaved && (
+                        <button
+                            onClick={handleRemoveApiKey}
+                            disabled={isLoadingApiKey || isSavingApiKey}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            🗑️ Xóa
+                        </button>
+                    )}
+                </div>
+
+                {/* Instructions */}
+                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <span>📖</span>
+                        <span>Hướng dẫn lấy Gemini API Key (Miễn phí):</span>
+                    </h3>
+                    <ol className="space-y-2 text-sm text-gray-700">
+                        <li className="flex gap-2">
+                            <span className="font-bold text-purple-600">1.</span>
+                            <span>Truy cập: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-semibold">https://aistudio.google.com/apikey</a></span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="font-bold text-purple-600">2.</span>
+                            <span>Đăng nhập bằng tài khoản Google của bạn</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="font-bold text-purple-600">3.</span>
+                            <span>Nhấn nút <strong>"Create API Key"</strong> hoặc <strong>"Get API Key"</strong></span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="font-bold text-purple-600">4.</span>
+                            <span>Chọn project (hoặc tạo mới nếu chưa có)</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="font-bold text-purple-600">5.</span>
+                            <span>Copy API Key và dán vào ô bên trên</span>
+                        </li>
+                        <li className="flex gap-2">
+                            <span className="font-bold text-purple-600">6.</span>
+                            <span>Nhấn <strong>"Lưu API Key"</strong> để hoàn tất</span>
+                        </li>
+                    </ol>
+
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-gray-700">
+                            <strong>💡 Lưu ý:</strong>
+                        </p>
+                        <ul className="text-sm text-gray-600 mt-2 space-y-1 ml-4 list-disc">
+                            <li>API Key của Gemini <strong>hoàn toàn miễn phí</strong> với hạn mức sử dụng hợp lý</li>
+                            <li>API Key được lưu trên trình duyệt của bạn (localStorage)</li>
+                            <li>Không ai có thể truy cập API Key của bạn</li>
+                            <li>Sử dụng cho: AI Generator, Support Chatbot</li>
+                            <li>Giới hạn: 15 requests/phút, 1500 requests/ngày (Free tier)</li>
+                        </ul>
+                    </div>
+
+                    <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-sm text-gray-700">
+                            <strong>✨ Lợi ích khi dùng API Key riêng:</strong>
+                        </p>
+                        <ul className="text-sm text-gray-600 mt-2 space-y-1 ml-4 list-disc">
+                            <li>Không bị giới hạn bởi API miễn phí của web</li>
+                            <li>Tốc độ phản hồi nhanh hơn</li>
+                            <li>Sử dụng không giới hạn các tính năng AI</li>
+                            <li>Chatbot thông minh hơn với Gemini 2.5</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Full Quiz History</h2>

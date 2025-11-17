@@ -1,13 +1,27 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { getApiKey } from './api';
 
 // Custom error to signal that the API key is missing or invalid.
 export const API_KEY_FAILURE = 'API_KEY_FAILURE';
 
 // Helper to get the correct API client (user's or developer's)
-const getApiClient = () => {
-    const userApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
-    // Use user's key if available, otherwise fall back to the environment variable.
-    const apiKey = userApiKey || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const getApiClient = async () => {
+    let apiKey: string | null = null;
+
+    // Try to get user's API key from backend
+    if (typeof window !== 'undefined') {
+        try {
+            const response = await getApiKey();
+            apiKey = response.apiKey;
+        } catch (error) {
+            console.warn("Could not fetch user API key from backend:", error);
+        }
+    }
+
+    // Fallback to environment variable if no user key
+    if (!apiKey) {
+        apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || null;
+    }
 
     if (!apiKey) {
         console.warn("No API key found. Prompting user.");
@@ -36,7 +50,7 @@ Chinese sentence (Pinyin)
 English Translation`;
 
     try {
-        const ai = getApiClient();
+        const ai = await getApiClient();
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -75,7 +89,7 @@ IMPORTANT: Respond ONLY with a valid JSON array of objects inside a single markd
 Each object in the array must have these exact keys: "hanzi", "pinyin", "meaning", "exampleSentence".`;
 
     try {
-        const ai = getApiClient();
+        const ai = await getApiClient();
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,

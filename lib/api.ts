@@ -1,9 +1,6 @@
 import { User, VocabSet, QuizHistory, QuizResultType, UserStats, LeaderboardUser, AdminStats, AdminUser } from './types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-  ? 'http://localhost:5001/api' 
-  : 'https://hanziflow-backend.onrender.com/api');
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL 
 // Custom error for auth failures
 export class AuthError extends Error {
   constructor(message: string) {
@@ -315,4 +312,22 @@ export const deleteAudioFile = async (fileId: string): Promise<{ success: boolea
 
 export const getAllAudioFiles = async (): Promise<{ success: boolean; data: any[] }> => {
     return apiFetch(`${API_URL}/audio/all/files`);
+};
+
+// API Key Management
+export const saveApiKey = async (apiKey: string): Promise<{ message: string; hasApiKey: boolean }> => {
+    return apiFetch(`${API_URL}/users/api-key`, {
+        method: 'PUT',
+        body: JSON.stringify({ apiKey }),
+    });
+};
+
+export const getApiKey = async (): Promise<{ apiKey: string | null; hasApiKey: boolean }> => {
+    return apiFetch(`${API_URL}/users/api-key`);
+};
+
+export const deleteApiKey = async (): Promise<{ message: string; hasApiKey: boolean }> => {
+    return apiFetch(`${API_URL}/users/api-key`, {
+        method: 'DELETE',
+    });
 };
