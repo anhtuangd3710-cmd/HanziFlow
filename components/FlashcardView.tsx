@@ -18,7 +18,11 @@ interface LocationState {
     studyMode: 'all' | 'review';
 }
 
-const FlashcardView: React.FC = () => {
+type FlashcardViewProps = {
+  onComplete?: () => void;
+};
+
+const FlashcardView: React.FC<FlashcardViewProps> = ({ onComplete }) => {
   const { setId } = useParams<{ setId: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -106,6 +110,14 @@ const FlashcardView: React.FC = () => {
     speakText(text);
   };
 
+  // Handle completion for MixedStudyMode
+  useEffect(() => {
+    if (currentIndex >= sessionItems.length && onComplete) {
+      const timer = setTimeout(() => onComplete(), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentIndex, sessionItems.length, onComplete]);
+
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -146,23 +158,30 @@ const FlashcardView: React.FC = () => {
   }
 
   if (currentIndex >= sessionItems.length) {
-      const isMixedMode = searchParams.get('studyMode') === 'mixed';
-      
-      // Mark mode as completed in sessionStorage for MixedStudyMode to detect
-      if (isMixedMode) {
-        sessionStorage.setItem('mixedModeCompleted', 'true');
+      // If onComplete provided (MixedStudyMode), show simple transition
+      if (onComplete) {
+        return (
+          <div className="min-h-[60vh] flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-7xl mb-6 animate-bounce">🎉</div>
+              <h2 className="text-4xl font-bold text-green-600 mb-4">Hoàn thành!</h2>
+              <p className="text-xl text-gray-600">Đang chuyển sang phần tiếp theo...</p>
+            </div>
+          </div>
+        );
       }
       
+      // Standalone mode - show full completion screen
       return (
         <div className="text-center p-8 bg-white rounded-lg shadow-md max-w-lg mx-auto">
             <h3 className="text-2xl font-bold text-green-600">Session Complete!</h3>
             <p className="text-gray-600 mt-2">You've reviewed all the words for this session.</p>
             <div className="flex justify-center gap-4 mt-6">
                 <button 
-                  onClick={() => isMixedMode ? window.history.back() : router.push('/')} 
+                  onClick={() => router.push('/')} 
                   className="py-2 px-6 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300"
                 >
-                    {isMixedMode ? 'Back to Mixed Mode' : 'Finish'}
+                    Finish
                 </button>
                 <button onClick={() => { setCurrentIndex(0); setSessionItems([...sessionItems].sort(() => Math.random() - 0.5)) }} className="py-2 px-6 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
                     Study Again

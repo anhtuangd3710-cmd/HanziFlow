@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useContext, useState, useRef } from 'react';
+import React, { useContext, useState, useRef, useEffect } from 'react';
 import { AudioContext } from '@/context/AudioContext';
 import { PlusIcon } from '@/components/icons/PlusIcon';
 import { TrashIcon } from '@/components/icons/TrashIcon';
@@ -35,7 +35,21 @@ export default function AudioPlayerPage() {
     deleteAudioFile,
     playAudio,
     setCurrentFolder,
+    loadFolders,
+    loadAudioFiles,
   } = context;
+
+  // Load folders and their files on mount
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
+
+  // Load audio files when a folder is selected
+  useEffect(() => {
+    if (selectedFolderId) {
+      loadAudioFiles(selectedFolderId);
+    }
+  }, [selectedFolderId, loadAudioFiles]);
 
   const handleCreateFolder = (e: React.FormEvent) => {
     e.preventDefault();

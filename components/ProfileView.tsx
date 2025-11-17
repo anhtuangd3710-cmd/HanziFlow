@@ -67,7 +67,7 @@ const ProfileView: React.FC = () => {
         }
         // Load existing API key from backend
         loadApiKey();
-    }, [context]);
+    }, []); // Empty dependency array - only run once on mount
 
     const loadApiKey = async () => {
         try {

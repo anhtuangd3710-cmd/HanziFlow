@@ -11,7 +11,11 @@ import { XCircleIcon } from './icons/XCircleIcon';
 
 type PracticeMode = 'pinyin' | 'meaning';
 
-const WritingPractice: React.FC = () => {
+type WritingPracticeProps = {
+  onComplete?: () => void;
+};
+
+const WritingPractice: React.FC<WritingPracticeProps> = ({ onComplete }) => {
   const params = useParams<{ setId: string }>();
   const { setId } = params;
   const router = useRouter();
@@ -82,9 +86,15 @@ const WritingPractice: React.FC = () => {
       setAnswered(false);
       setIsCorrect(false);
     } else {
-      // Show summary
-      alert(`Hoàn thành! Bạn trả lời đúng ${score}/${totalAnswered}`);
-      router.back();
+      // Completed all items
+      if (onComplete) {
+        // MixedStudyMode - call callback
+        setTimeout(() => onComplete(), 1000);
+      } else {
+        // Standalone - show alert and go back
+        alert(`Hoàn thành! Bạn trả lời đúng ${score}/${totalAnswered}`);
+        router.back();
+      }
     }
   };
 
@@ -172,12 +182,7 @@ const WritingPractice: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => {
-              if (searchParams.get('studyMode') === 'mixed') {
-                sessionStorage.setItem('mixedModeCompleted', 'true');
-              }
-              router.back();
-            }}
+            onClick={() => router.back()}
             className="text-indigo-600 hover:text-indigo-700 font-semibold mb-4"
           >
             ← Quay lại

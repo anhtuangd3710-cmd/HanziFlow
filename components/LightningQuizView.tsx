@@ -53,7 +53,11 @@ const playTone = (frequency: number, duration: number, type: OscillatorType = 's
 
 
 
-const LightningQuizView: React.FC = () => {
+type LightningQuizViewProps = {
+  onComplete?: () => void;
+};
+
+const LightningQuizView: React.FC<LightningQuizViewProps> = ({ onComplete }) => {
   const { setId } = useParams<{ setId: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -168,13 +172,14 @@ const LightningQuizView: React.FC = () => {
         await saveQuizResult(setId, result);
     }
     
-    if (searchParams.get('studyMode') === 'mixed') {
-        sessionStorage.setItem('mixedModeCompleted', 'true');
-        window.history.back();
+    if (onComplete) {
+        // MixedStudyMode - call callback after delay
+        setTimeout(() => onComplete(), 1000);
     } else {
-        router.push(`/set/${setId}/result`);
+        // Standalone - go back to set page
+        router.push(`/set/${setId}`);
     }
-  }, [isFinished, saveQuizResult, router, setId]);
+  }, [isFinished, saveQuizResult, router, setId, onComplete]);
 
 
   // Timer logic

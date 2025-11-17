@@ -78,7 +78,11 @@ const playTone = (frequency: number, duration: number, type: OscillatorType = 's
     }
 };
 
-const QuizView: React.FC = () => {
+type QuizViewProps = {
+  onComplete?: () => void;
+};
+
+const QuizView: React.FC<QuizViewProps> = ({ onComplete }) => {
   const params = useParams<{ setId: string }>();
   const setId = params.setId;
   const router = useRouter();
@@ -219,7 +223,14 @@ const QuizView: React.FC = () => {
         if (setId) {
             await saveQuizResult(setId, result);
         }
-        router.push(`/set/${setId}/result`);
+        
+        if (onComplete) {
+            // MixedStudyMode - call callback
+            setTimeout(() => onComplete(), 1000);
+        } else {
+            // Standalone - go back to set page
+            router.push(`/set/${setId}`);
+        }
       }
     }, 1200);
   };
@@ -253,9 +264,8 @@ const QuizView: React.FC = () => {
                 }
             </p>
             <button onClick={() => {
-              if (searchParams.get('studyMode') === 'mixed') {
-                sessionStorage.setItem('mixedModeCompleted', 'true');
-                window.history.back();
+              if (onComplete) {
+                onComplete();
               } else {
                 router.push('/');
               }
@@ -343,9 +353,8 @@ const QuizView: React.FC = () => {
         </div>
         {renderAnswerArea()}
          <button onClick={() => {
-          if (searchParams.get('studyMode') === 'mixed') {
-            sessionStorage.setItem('mixedModeCompleted', 'true');
-            window.history.back();
+          if (onComplete) {
+            onComplete();
           } else {
             router.push('/');
           }
