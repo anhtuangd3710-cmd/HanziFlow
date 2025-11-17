@@ -68,17 +68,29 @@ const SYSTEM_CONTEXT = `Bạn là trợ lý ảo thông minh của HanziFlow - �
 
 Hãy trả lời bằng tiếng Việt, ngắn gọn và hữu ích!`;
 
+// Cache for API key to avoid repeated backend calls
+let cachedChatbotApiKey: string | null = null;
+let chatbotApiKeyFetched = false;
+
 // Get Gemini API client
 const getGeminiClient = async () => {
   let apiKey: string | null = null;
 
-  // Try to get user's API key from backend
-  if (typeof window !== 'undefined') {
-    try {
-      const response = await getApiKey();
-      apiKey = response.apiKey;
-    } catch (error) {
-      console.warn("Could not fetch user API key from backend:", error);
+  // Use cached key if already fetched
+  if (chatbotApiKeyFetched) {
+    apiKey = cachedChatbotApiKey;
+  } else {
+    // Try to get user's API key from backend (only once)
+    if (typeof window !== 'undefined') {
+      try {
+        const response = await getApiKey();
+        apiKey = response.apiKey;
+        cachedChatbotApiKey = apiKey;
+        chatbotApiKeyFetched = true;
+      } catch (error) {
+        console.warn("Could not fetch user API key from backend:", error);
+        chatbotApiKeyFetched = true; // Mark as fetched to avoid retries
+      }
     }
   }
 

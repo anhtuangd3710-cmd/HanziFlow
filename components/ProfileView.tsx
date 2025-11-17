@@ -13,6 +13,7 @@ import BadgeShowcase from './BadgeShowcase';
 import StreakAndAchievements from './StreakAndAchievements';
 import { QuizHistory } from '@/lib/types';
 import { saveApiKey, getApiKey, deleteApiKey } from '@/lib/api';
+import { clearApiKeyCache } from '@/lib/geminiService';
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string | number }> = ({ icon, label, value }) => (
     <div className="bg-gray-50 p-4 rounded-lg flex items-center">
@@ -93,6 +94,8 @@ const ProfileView: React.FC = () => {
             setIsSavingApiKey(true);
             await saveApiKey(apiKey.trim());
             setApiKeySaved(true);
+            // Clear cache so new key will be used immediately
+            clearApiKeyCache();
             alert('✅ API Key đã được lưu thành công!');
         } catch (error: any) {
             console.error('Error saving API key:', error);
@@ -112,6 +115,8 @@ const ProfileView: React.FC = () => {
             await deleteApiKey();
             setApiKey('');
             setApiKeySaved(false);
+            // Clear cache so env key will be used
+            clearApiKeyCache();
             alert('🗑️ API Key đã được xóa!');
         } catch (error: any) {
             console.error('Error deleting API key:', error);

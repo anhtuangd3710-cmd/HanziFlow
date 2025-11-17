@@ -4,17 +4,29 @@ import { getApiKey } from './api';
 // Custom error to signal that the API key is missing or invalid.
 export const API_KEY_FAILURE = 'API_KEY_FAILURE';
 
+// Cache for API key to avoid repeated backend calls
+let cachedApiKey: string | null = null;
+let apiKeyFetched = false;
+
 // Helper to get the correct API client (user's or developer's)
 const getApiClient = async () => {
     let apiKey: string | null = null;
 
-    // Try to get user's API key from backend
-    if (typeof window !== 'undefined') {
-        try {
-            const response = await getApiKey();
-            apiKey = response.apiKey;
-        } catch (error) {
-            console.warn("Could not fetch user API key from backend:", error);
+    // Use cached key if already fetched
+    if (apiKeyFetched) {
+        apiKey = cachedApiKey;
+    } else {
+        // Try to get user's API key from backend (only once)
+        if (typeof window !== 'undefined') {
+            try {
+                const response = await getApiKey();
+                apiKey = response.apiKey;
+                cachedApiKey = apiKey;
+                apiKeyFetched = true;
+            } catch (error) {
+                console.warn("Could not fetch user API key from backend:", error);
+                apiKeyFetched = true; // Mark as fetched even on error to avoid retries
+            }
         }
     }
 
@@ -28,6 +40,12 @@ const getApiClient = async () => {
         throw new Error(API_KEY_FAILURE);
     }
     return new GoogleGenAI({ apiKey });
+};
+
+// Function to clear API key cache (useful after user updates their key)
+export const clearApiKeyCache = () => {
+    cachedApiKey = null;
+    apiKeyFetched = false;
 };
 
 // --- Text-to-Speech using Web Speech API ---
