@@ -1,6 +1,0 @@
-{
-  "name": "hanziflow",
-  "compatibility_date": "2025-11-26",
-  "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": ".vercel/output/static"
-}
