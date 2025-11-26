@@ -3,7 +3,7 @@
 import React, { createContext, useReducer, ReactNode, useCallback, useEffect } from 'react';
 import { AppState, Action, User, VocabSet, QuizHistory, QuizResultType, VocabItem, UserStats, LeaderboardUser, AdminStats, AdminUser } from '@/lib/types';
 import * as api from '@/lib/api';
-import { AuthError } from '@/lib/api';
+import { AuthError, EmailVerificationError } from '@/lib/api';
 import * as geminiService from '@/lib/geminiService';
 
 const initialState: AppState = {
@@ -173,7 +173,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'LOGIN', payload: userWithToken });
         } catch (error) {
             console.error(error);
-            alert((error as Error).message || "Login failed. Please check your credentials.");
+            if (error instanceof EmailVerificationError) {
+                // Redirect to resend verification page
+                if (typeof window !== 'undefined') {
+                    const shouldResend = confirm(
+                        `${error.message}\n\nWould you like to resend the verification email?`
+                    );
+                    if (shouldResend) {
+                        window.location.href = `/resend-verification?email=${encodeURIComponent(error.email)}`;
+                    }
+                }
+            } else {
+                alert((error as Error).message || "Login failed. Please check your credentials.");
+            }
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     };
@@ -193,12 +205,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    const googleSignIn = async (accessToken: string, name: string, email: string) => {
+    const googleSignIn = async (googleId: string, name: string, email: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         try {
-            // Decode Google ID token to get user ID
-            // For simplicity, we'll use email as unique identifier
-            const response = await api.googleAuth(email, name, email);
+            // Pass Google's unique user ID to backend
+            const response = await api.googleAuth(googleId, name, email);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(response));
             dispatch({ type: 'LOGIN', payload: response });
         } catch (error) {

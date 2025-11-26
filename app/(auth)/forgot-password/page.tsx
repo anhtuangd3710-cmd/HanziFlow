@@ -48,6 +48,16 @@ export default function ForgotPasswordPage() {
         }
     };
 
+    const validatePassword = (pwd: string): string | null => {
+        if (!pwd) return 'Password is required';
+        if (pwd.length < 8) return 'Password must be at least 8 characters';
+        if (!/(?=.*[a-z])/.test(pwd)) return 'Must contain a lowercase letter';
+        if (!/(?=.*[A-Z])/.test(pwd)) return 'Must contain an uppercase letter';
+        if (!/(?=.*\d)/.test(pwd)) return 'Must contain a number';
+        if (!/(?=.*[\W_])/.test(pwd)) return 'Must contain a special character';
+        return null;
+    };
+
     const handleResetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -60,18 +70,14 @@ export default function ForgotPasswordPage() {
                 return;
             }
 
-            if (!newPassword) {
-                setError('Please enter a new password');
+            const passwordError = validatePassword(newPassword);
+            if (passwordError) {
+                setError(passwordError);
                 return;
             }
 
             if (newPassword !== confirmPassword) {
                 setError('Passwords do not match');
-                return;
-            }
-
-            if (newPassword.length < 6) {
-                setError('Password must be at least 6 characters');
                 return;
             }
 
@@ -173,6 +179,26 @@ export default function ForgotPasswordPage() {
                                     disabled={isLoading}
                                 />
                             </div>
+                            {/* Password Requirements */}
+                            {newPassword && (
+                                <div className="mt-2 space-y-1">
+                                    <p className={`text-xs flex items-center gap-1 ${newPassword.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {newPassword.length >= 8 ? '✓' : '○'} At least 8 characters
+                                    </p>
+                                    <p className={`text-xs flex items-center gap-1 ${/[a-z]/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {/[a-z]/.test(newPassword) ? '✓' : '○'} Lowercase letter
+                                    </p>
+                                    <p className={`text-xs flex items-center gap-1 ${/[A-Z]/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {/[A-Z]/.test(newPassword) ? '✓' : '○'} Uppercase letter
+                                    </p>
+                                    <p className={`text-xs flex items-center gap-1 ${/\d/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {/\d/.test(newPassword) ? '✓' : '○'} Number
+                                    </p>
+                                    <p className={`text-xs flex items-center gap-1 ${/[\W_]/.test(newPassword) ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {/[\W_]/.test(newPassword) ? '✓' : '○'} Special character
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -191,6 +217,12 @@ export default function ForgotPasswordPage() {
                                     disabled={isLoading}
                                 />
                             </div>
+                            {confirmPassword && newPassword !== confirmPassword && (
+                                <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                            )}
+                            {confirmPassword && newPassword === confirmPassword && (
+                                <p className="text-xs text-green-600 mt-1">✓ Passwords match</p>
+                            )}
                         </div>
 
                         <button

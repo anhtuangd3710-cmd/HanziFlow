@@ -83,13 +83,14 @@ const AuthScreen: React.FC = () => {
         onSuccess: async (codeResponse) => {
           setIsGoogleLoading(true);
           try {
-            // Get user info from Google ID token
+            // Get user info from Google API
             const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + codeResponse.access_token);
             const googleUser = await response.json();
             
-            // Call backend Google Auth
+            // Call backend Google Auth with Google ID (sub or id field)
             if (googleSignIn) {
-              await googleSignIn(codeResponse.access_token, googleUser.name || googleUser.email.split('@')[0], googleUser.email);
+              // Use Google's unique user ID as googleId
+              await googleSignIn(googleUser.id, googleUser.name || googleUser.email.split('@')[0], googleUser.email);
             }
           } catch (error) {
             console.error('Google login failed:', error);

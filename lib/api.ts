@@ -61,6 +61,17 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
 
 
 // --- Auth (These do not use apiFetch as they don't require a token) ---
+
+// Custom error for email verification required
+export class EmailVerificationError extends Error {
+    email: string;
+    constructor(message: string, email: string) {
+        super(message);
+        this.name = 'EmailVerificationError';
+        this.email = email;
+    }
+}
+
 export const loginUser = async (email: string, password: string): Promise<User> => {
     const res = await fetch(`${API_URL}/users/login`, {
         method: 'POST',
@@ -70,6 +81,10 @@ export const loginUser = async (email: string, password: string): Promise<User> 
 
     if (!res.ok) {
         const errorData = await res.json();
+        // Check if it's a verification required error
+        if (errorData.needsVerification) {
+            throw new EmailVerificationError(errorData.message, errorData.email);
+        }
         throw new Error(errorData.message || 'Login failed');
     }
     return await res.json();
@@ -127,6 +142,20 @@ export const verifyEmail = async (token: string, email: string): Promise<User> =
     if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || 'Failed to verify email');
+    }
+    return await res.json();
+};
+
+export const resendVerificationEmail = async (email: string): Promise<{ message: string }> => {
+    const res = await fetch(`${API_URL}/users/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to resend verification email');
     }
     return await res.json();
 };

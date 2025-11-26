@@ -76,15 +76,15 @@ export default function VerifyEmailPage() {
                         <p className="text-gray-600 mt-2">{message}</p>
                         <div className="mt-6 space-y-3">
                             <Link
-                                href="/login"
-                                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                                href={`/resend-verification${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+                                className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition"
                             >
-                                Back to Login
+                                Resend Verification Email
                             </Link>
                             <p className="text-sm text-gray-500">
-                                Need to register again?{' '}
-                                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                                    Sign up here
+                                Or{' '}
+                                <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+                                    back to Login
                                 </Link>
                             </p>
                         </div>

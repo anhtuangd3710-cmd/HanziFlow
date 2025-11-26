@@ -7,6 +7,7 @@ export interface User {
   createdAt?: string; // Added from backend timestamps
   role?: 'user' | 'admin';
   message?: string; // For auth response messages
+  isEmailVerified?: boolean; // Email verification status
   // --- Gamification Fields ---
   xp: number;
   currentStreak: number;
